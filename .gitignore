@@ -1,0 +1,38 @@
+# --- Unity generated ---
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Mm]emoryCaptures/
+UserSettings/
+SysInfo.txt
+
+# Crash reports
+*.pidb
+*.mdb
+
+# --- Unity cache ---
+/Assets/AssetStore-*
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+
+# --- IDE ---
+# Rider / IntelliJ
+.idea/
+# VS
+.vs/
+*.user
+*.userprefs
+*.csproj
+*.sln.DotSettings
+
+# --- Misc ---
+*.tmproj
+*.booproj
+
+# If you export packages
+*.unitypackage
