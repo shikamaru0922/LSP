@@ -100,8 +100,12 @@ namespace LSP.Gameplay
         private float cachedMasterVolume = 1f;
         private float cachedMonsterSpeed;
         private GUIStyle headerStyle;
+
+        // Persistence runtime cache
         private GameplayDebugSettingsData persistedSettings;
         private string settingsFilePath;
+
+        // Cursor state cache
         private bool cursorStateCached;
         private CursorLockMode previousCursorLock;
         private bool previousCursorVisible;
