@@ -84,7 +84,7 @@ namespace LSP.Gameplay
             }
 
             MonsterState previousState = currentState;
-            bool inView = playerVision.CanSee(monsterCollider.bounds);
+            bool inView = playerVision.CanSee(monsterCollider);
             timeSinceLastSeen = inView ? 0f : timeSinceLastSeen + deltaTime;
 
             bool shouldHoldStationary = inView || timeSinceLastSeen < visionHoldDuration;
@@ -98,10 +98,6 @@ namespace LSP.Gameplay
             {
                 ResumeNavMeshAgent();
             }
-            
-            Debug.Log($"[MonsterVision] inView={playerVision?.CanSee(monsterCollider.bounds)} " +
-                      $"eyesOpen={(playerVision != null && playerVision.MaxDetectionDistance >= 0 ? (playerVision.GetComponent<PlayerEyeControl>()?.EyesOpen).ToString() : "N/A")} " +
-                      $"state={currentState} timeSinceLastSeen={timeSinceLastSeen:F2} cam={(playerVision ? playerVision.name : "null")}");
         }
 
         private void UpdateMovement(float deltaTime)
