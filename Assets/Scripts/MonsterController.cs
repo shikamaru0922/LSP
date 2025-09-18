@@ -41,6 +41,7 @@ namespace LSP.Gameplay
         [Tooltip("Fallback speed used when the monster is moved directly because the NavMeshAgent is unavailable.")]
         [SerializeField]
         private float fallbackMoveSpeed = 2.5f;
+
         public static event Action<MonsterController> MonsterReset;
 
         private Collider monsterCollider;
