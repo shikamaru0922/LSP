@@ -35,7 +35,11 @@ namespace LSP.Gameplay
 
         private NpcState currentState = NpcState.Normal;
         private readonly List<bool> cachedBehaviourStates = new List<bool>();
+
+        // 原来只缓存了 speed；现在同时缓存 enabled 状态
         private float originalAnimatorSpeed = 1f;
+        private bool originalAnimatorEnabled = true;
+
         private bool isSubscribed;
 
         public NpcState CurrentState => currentState;
@@ -77,7 +81,7 @@ namespace LSP.Gameplay
         {
             UnsubscribeFromManager();
             RestoreBehaviours();
-            RestoreAnimatorSpeed();
+            RestoreAnimatorState(); // 恢复 Animator 的启用与速度
             currentState = NpcState.Normal;
         }
 
@@ -114,22 +118,14 @@ namespace LSP.Gameplay
 
         private void SubscribeToManager()
         {
-            if (isSubscribed)
-            {
-                return;
-            }
-
+            if (isSubscribed) return;
             GameManager.WorldAbnormalStateChanged += ApplyWorldState;
             isSubscribed = true;
         }
 
         private void UnsubscribeFromManager()
         {
-            if (!isSubscribed)
-            {
-                return;
-            }
-
+            if (!isSubscribed) return;
             GameManager.WorldAbnormalStateChanged -= ApplyWorldState;
             isSubscribed = false;
         }
@@ -141,10 +137,7 @@ namespace LSP.Gameplay
 
         private void SetState(NpcState newState)
         {
-            if (currentState == newState)
-            {
-                return;
-            }
+            if (currentState == newState) return;
 
             currentState = newState;
 
@@ -162,14 +155,15 @@ namespace LSP.Gameplay
         {
             CacheBehaviourStates();
             DisableBehaviours();
-            CacheAnimatorSpeed();
-            SetAnimatorSpeed(0f);
+
+            CacheAnimatorState();     // 先缓存
+            DisableAnimator();        // ★ 直接禁用 Animator（满足你的“先直接把 animator 不启用”的需求）
         }
 
         private void ExitDeadStare()
         {
             RestoreBehaviours();
-            RestoreAnimatorSpeed();
+            RestoreAnimatorState();    // 还原 Animator 的 enabled 与 speed
         }
 
         private void DisableBehaviours()
@@ -189,51 +183,45 @@ namespace LSP.Gameplay
             for (int i = 0; i < behavioursToDisable.Count; i++)
             {
                 Behaviour behaviour = behavioursToDisable[i];
-                if (behaviour == null)
-                {
-                    continue;
-                }
+                if (behaviour == null) continue;
 
                 bool enabledState = i < cachedBehaviourStates.Count && cachedBehaviourStates[i];
                 behaviour.enabled = enabledState;
             }
         }
 
-        private void CacheAnimatorSpeed()
+        // —— Animator 相关：从只管 speed 升级为同时管理 enabled 与 speed ——
+        private void CacheAnimatorState()
         {
-            if (animator != null)
-            {
-                originalAnimatorSpeed = animator.speed;
-            }
+            if (animator == null) return;
+            originalAnimatorEnabled = animator.enabled;
+            originalAnimatorSpeed = animator.speed;
         }
 
-        private void SetAnimatorSpeed(float speed)
+        private void DisableAnimator()
         {
-            if (animator != null)
-            {
-                animator.speed = speed;
-            }
+            if (animator == null) return;
+
+            // 直接禁用 Animator，确保完全停止动画/根运动/状态机
+            animator.enabled = false;
+
+            // 如果你更希望“禁用 + 避免某些系统在下一帧又启用它”，
+            // 也可以顺带将 speed 置 0 作为兜底（但在 enabled=false 时 speed 实际不会生效）
+            animator.speed = 0f;
         }
 
-        private void RestoreAnimatorSpeed()
+        private void RestoreAnimatorState()
         {
-            SetAnimatorSpeed(originalAnimatorSpeed);
+            if (animator == null) return;
+            animator.enabled = originalAnimatorEnabled;
+            animator.speed = originalAnimatorSpeed;
         }
 
-        public void SetPlayerTransform(Transform player)
-        {
-            playerTransform = player;
-        }
+        public void SetPlayerTransform(Transform player) => playerTransform = player;
 
-        public void SetHeadTransform(Transform head)
-        {
-            headTransform = head;
-        }
+        public void SetHeadTransform(Transform head) => headTransform = head;
 
-        public void SetAnimator(Animator targetAnimator)
-        {
-            animator = targetAnimator;
-        }
+        public void SetAnimator(Animator targetAnimator) => animator = targetAnimator;
 
         public void SetBehavioursToDisable(List<Behaviour> behaviours)
         {
