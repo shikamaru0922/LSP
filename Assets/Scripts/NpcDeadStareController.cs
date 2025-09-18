@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -7,8 +6,7 @@ namespace LSP.Gameplay
     public enum NpcState
     {
         Normal,
-        DeadStare,
-        Death
+        DeadStare
     }
 
     /// <summary>
@@ -35,31 +33,6 @@ namespace LSP.Gameplay
         [SerializeField]
         private float headTurnSpeed = 360f;
 
-        [Header("Death Handling")]
-        [Tooltip("Monster instance used to trigger the NPC death state when it gets close.")]
-        [SerializeField]
-        private MonsterController monster;
-
-        [Tooltip("Distance threshold that determines how close the monster must be to kill the NPC.")]
-        [Min(0f)]
-        [SerializeField]
-        private float deathTriggerDistance = 1.5f;
-
-        [Tooltip("Animator state name that should be played when the NPC dies.")]
-        [SerializeField]
-        private string deathAnimationStateName = "Death";
-
-        [Tooltip("Optional animation clip used to determine how long to wait before freezing the animator.")]
-        [SerializeField]
-        private AnimationClip deathAnimationClip;
-
-        [Tooltip("Optional audio clip that is played when the NPC dies.")]
-        [SerializeField]
-        private AudioClip deathAudioClip;
-
-        [SerializeField]
-        private AudioSource deathAudioSource;
-
         private NpcState currentState = NpcState.Normal;
         private readonly List<bool> cachedBehaviourStates = new List<bool>();
         private float originalAnimatorSpeed = 1f;
@@ -67,9 +40,6 @@ namespace LSP.Gameplay
         private bool isSubscribed;
         private bool hasCachedWorldState;
         private bool lastKnownWorldAbnormal;
-        private Coroutine deathAnimationRoutine;
-        private int lastPlayedDeathStateHash;
-        private bool hasLastPlayedDeathState;
 
         public NpcState CurrentState => currentState;
 
@@ -86,20 +56,6 @@ namespace LSP.Gameplay
             }
 
             CacheBehaviourStates();
-
-            if (deathAudioSource == null)
-            {
-                deathAudioSource = GetComponent<AudioSource>();
-                if (deathAudioSource == null)
-                {
-                    deathAudioSource = gameObject.AddComponent<AudioSource>();
-                }
-            }
-
-            if (deathAudioSource != null)
-            {
-                deathAudioSource.playOnAwake = false;
-            }
 
             if (animator != null)
             {
@@ -118,8 +74,6 @@ namespace LSP.Gameplay
                     playerTransform = playerState.transform;
                 }
             }
-
-            ResolveMonsterReference();
         }
 
         private void OnEnable()
@@ -135,28 +89,11 @@ namespace LSP.Gameplay
             RestoreAnimatorState();
             currentState = NpcState.Normal;
             hasCachedWorldState = false;
-
-            if (deathAnimationRoutine != null)
-            {
-                StopCoroutine(deathAnimationRoutine);
-                deathAnimationRoutine = null;
-            }
         }
 
         private void Update()
         {
-            if (currentState == NpcState.Death)
-            {
-                return;
-            }
-
             RefreshWorldState(false);
-            CheckMonsterProximity();
-
-            if (currentState == NpcState.Death)
-            {
-                return;
-            }
 
             if (currentState != NpcState.DeadStare)
             {
@@ -211,11 +148,6 @@ namespace LSP.Gameplay
 
         private void ApplyWorldState(bool isWorldAbnormal)
         {
-            if (currentState == NpcState.Death)
-            {
-                return;
-            }
-
             hasCachedWorldState = true;
             lastKnownWorldAbnormal = isWorldAbnormal;
             SetState(isWorldAbnormal ? NpcState.DeadStare : NpcState.Normal);
@@ -234,11 +166,6 @@ namespace LSP.Gameplay
 
         private void SetState(NpcState newState)
         {
-            if (currentState == NpcState.Death)
-            {
-                return;
-            }
-
             if (currentState == newState)
             {
                 return;
@@ -246,17 +173,13 @@ namespace LSP.Gameplay
 
             currentState = newState;
 
-            switch (currentState)
+            if (currentState == NpcState.DeadStare)
             {
-                case NpcState.DeadStare:
-                    EnterDeadStare();
-                    break;
-                case NpcState.Normal:
-                    ExitDeadStare();
-                    break;
-                case NpcState.Death:
-                    EnterDeath();
-                    break;
+                EnterDeadStare();
+            }
+            else
+            {
+                ExitDeadStare();
             }
         }
 
@@ -265,21 +188,13 @@ namespace LSP.Gameplay
             CacheBehaviourStates();
             DisableBehaviours();
             CacheAnimatorState();
-            DisableAnimator();
+            DisableAnimator(); // 直接禁用 Animator 组件
         }
 
         private void ExitDeadStare()
         {
             RestoreBehaviours();
             RestoreAnimatorState();
-        }
-
-        private void EnterDeath()
-        {
-            DisableBehaviours();
-            UnsubscribeFromManager();
-            PlayDeathAudio();
-            PlayDeathAnimation();
         }
 
         private void DisableBehaviours()
@@ -355,140 +270,6 @@ namespace LSP.Gameplay
         {
             behavioursToDisable = behaviours ?? new List<Behaviour>();
             CacheBehaviourStates();
-        }
-
-        private void ResolveMonsterReference()
-        {
-            if (monster != null)
-            {
-                return;
-            }
-
-            monster = FindObjectOfType<MonsterController>();
-        }
-
-        private void CheckMonsterProximity()
-        {
-            ResolveMonsterReference();
-
-            if (monster == null || monster.CurrentState != MonsterState.Chasing)
-            {
-                return;
-            }
-
-            float distanceThreshold = Mathf.Max(0f, deathTriggerDistance);
-            float thresholdSqr = distanceThreshold * distanceThreshold;
-            Vector3 difference = monster.transform.position - transform.position;
-
-            if (difference.sqrMagnitude <= thresholdSqr)
-            {
-                SetState(NpcState.Death);
-            }
-        }
-
-        private void PlayDeathAudio()
-        {
-            if (deathAudioSource == null)
-            {
-                return;
-            }
-
-            if (deathAudioClip != null)
-            {
-                deathAudioSource.PlayOneShot(deathAudioClip);
-            }
-        }
-
-        private void PlayDeathAnimation()
-        {
-            if (animator == null)
-            {
-                return;
-            }
-
-            animator.enabled = true;
-            animator.speed = 1f;
-
-            if (deathAnimationRoutine != null)
-            {
-                StopCoroutine(deathAnimationRoutine);
-                deathAnimationRoutine = null;
-            }
-
-            string stateToPlay = !string.IsNullOrEmpty(deathAnimationStateName)
-                ? deathAnimationStateName
-                : deathAnimationClip != null
-                    ? deathAnimationClip.name
-                    : string.Empty;
-
-            float clipLength = deathAnimationClip != null ? deathAnimationClip.length : 0f;
-
-            if (!string.IsNullOrEmpty(stateToPlay))
-            {
-                int stateHash = Animator.StringToHash(stateToPlay);
-                hasLastPlayedDeathState = animator.HasState(0, stateHash);
-
-                if (hasLastPlayedDeathState)
-                {
-                    animator.Play(stateHash, 0, 0f);
-                }
-                else
-                {
-                    animator.Play(stateToPlay, 0, 0f);
-                }
-
-                animator.Update(0f);
-                lastPlayedDeathStateHash = stateHash;
-
-                if (clipLength <= 0f)
-                {
-                    AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
-                    clipLength = stateInfo.length;
-                }
-            }
-            else
-            {
-                hasLastPlayedDeathState = false;
-                lastPlayedDeathStateHash = 0;
-            }
-
-            if (clipLength > 0f)
-            {
-                deathAnimationRoutine = StartCoroutine(FreezeAnimatorAfter(clipLength));
-            }
-            else
-            {
-                SnapAnimatorToLastFrame();
-            }
-        }
-
-        private IEnumerator FreezeAnimatorAfter(float delay)
-        {
-            yield return new WaitForSeconds(delay);
-
-            SnapAnimatorToLastFrame();
-            deathAnimationRoutine = null;
-        }
-
-        private void SnapAnimatorToLastFrame()
-        {
-            if (animator == null)
-            {
-                return;
-            }
-
-            if (hasLastPlayedDeathState)
-            {
-                animator.Play(lastPlayedDeathStateHash, 0, 1f);
-            }
-            else
-            {
-                AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
-                animator.Play(stateInfo.fullPathHash, 0, 1f);
-            }
-
-            animator.Update(0f);
-            DisableAnimator();
         }
     }
 }

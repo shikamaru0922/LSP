@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
@@ -18,11 +17,6 @@ namespace LSP.Gameplay
     [RequireComponent(typeof(NavMeshAgent))]
     public class MonsterController : MonoBehaviour
     {
-        /// <summary>
-        /// Raised whenever the monster is reset by the disabler device.
-        /// </summary>
-        public static event Action<MonsterController> MonsterReset;
-
         [SerializeField]
         private Transform chaseTarget;
 
@@ -43,6 +37,10 @@ namespace LSP.Gameplay
         [SerializeField]
         private NavMeshAgent navMeshAgent;
 
+        [Tooltip("Fallback speed used when the monster is moved directly because the NavMeshAgent is unavailable.")]
+        [SerializeField]
+        private float fallbackMoveSpeed = 2.5f;
+
         private Collider monsterCollider;
         private MonsterState currentState = MonsterState.Stationary;
         private Vector3 spawnPosition;
@@ -52,6 +50,7 @@ namespace LSP.Gameplay
         private bool subscribedToWorldEvent;
 
         public MonsterState CurrentState => currentState;
+        public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
 
         private void Awake()
         {
@@ -61,6 +60,16 @@ namespace LSP.Gameplay
             if (navMeshAgent == null)
             {
                 navMeshAgent = GetComponent<NavMeshAgent>();
+            }
+
+            // 同步直线移动与 NavMesh 的速度
+            if (navMeshAgent != null && navMeshAgent.speed > 0f)
+            {
+                fallbackMoveSpeed = navMeshAgent.speed;
+            }
+            else if (navMeshAgent != null && navMeshAgent.speed <= 0f)
+            {
+                navMeshAgent.speed = Mathf.Max(0f, fallbackMoveSpeed);
             }
 
             timeSinceLastSeen = visionHoldDuration;
@@ -194,7 +203,6 @@ namespace LSP.Gameplay
 
             StopNavMeshAgent();
             currentState = MonsterState.Stationary;
-            MonsterReset?.Invoke(this);
             yield return new WaitForSeconds(disablerFreezeDuration);
             disablerRoutine = null;
             currentState = isWorldAbnormal ? MonsterState.Chasing : MonsterState.Stationary;
@@ -235,6 +243,11 @@ namespace LSP.Gameplay
         {
             navMeshAgent = agent;
 
+            if (navMeshAgent != null)
+            {
+                navMeshAgent.speed = Mathf.Max(0f, fallbackMoveSpeed);
+            }
+
             if (currentState == MonsterState.Chasing)
             {
                 ResumeNavMeshAgent();
@@ -255,8 +268,22 @@ namespace LSP.Gameplay
                 return;
             }
 
-            float speed = navMeshAgent != null ? navMeshAgent.speed : 0f;
+            float speed = fallbackMoveSpeed;
             transform.position += direction.normalized * speed * deltaTime;
+        }
+
+        /// <summary>
+        /// Overrides the monster's move speed. Applies to both NavMesh and direct movement.
+        /// </summary>
+        public void SetMoveSpeed(float speed)
+        {
+            float clampedSpeed = Mathf.Max(0f, speed);
+            fallbackMoveSpeed = clampedSpeed;
+
+            if (IsNavMeshAgentAvailable)
+            {
+                navMeshAgent.speed = clampedSpeed;
+            }
         }
 
         private void StopNavMeshAgent()

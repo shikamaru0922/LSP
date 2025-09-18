@@ -20,7 +20,11 @@ namespace LSP.Gameplay
         /// <summary>
         /// The speed value that should be used by movement scripts.
         /// </summary>
-        public float MovementSpeed => movementSpeed;
+        public float MovementSpeed
+        {
+            get => movementSpeed;
+            set => movementSpeed = Mathf.Max(0f, value);
+        }
 
         public event Action PlayerKilled;
 
