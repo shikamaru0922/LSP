@@ -244,9 +244,11 @@ MonoBehaviour:
   chaseTarget: {fileID: 1321696449}
   playerVision: {fileID: 1710761703}
   navigationGraph: {fileID: 218176741}
-  repathInterval: 0.01
-  waypointTolerance: 0.01
-  disablerFreezeDuration: 0.02
+  repathInterval: 0
+  waypointTolerance: 0
+  disablerFreezeDuration: 0
+  visionHoldDuration: 0
+  navMeshAgent: {fileID: 0}
 --- !u!1 &218176740
 GameObject:
   m_ObjectHideFlags: 0
@@ -521,6 +523,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   viewCamera: {fileID: 0}
   eyeControl: {fileID: 0}
+  maxDetectionDistance: 999
 --- !u!114 &1710761704
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -683,7 +686,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   viewCamera: {fileID: 1755271701}
-  eyeControl: {fileID: 0}
+  eyeControl: {fileID: 1710761704}
+  maxDetectionDistance: 999
 --- !u!114 &1755271703
 MonoBehaviour:
   m_ObjectHideFlags: 0
