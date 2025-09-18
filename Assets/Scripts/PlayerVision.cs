@@ -186,4 +186,30 @@ namespace LSP.Gameplay
         /// <summary>
         /// Injects the eye control dependency at runtime, allowing prefabs with
         /// pre-configured controllers to provide their existing component.
-        /// </summar
+        /// </summary>
+        public void SetEyeControl(PlayerEyeControl control)
+        {
+            eyeControl = control;
+        }
+
+        /// <summary>
+        /// Overrides the set of layers considered for line-of-sight checks.
+        /// Providing an empty mask disables occlusion testing entirely.
+        /// </summary>
+        public void SetOcclusionLayers(LayerMask layers)
+        {
+            occlusionLayers = layers;
+        }
+
+        /// <summary>
+        /// Allows runtime systems to override the maximum vision distance.
+        /// Setting the value to zero or below removes the distance limit.
+        /// </summary>
+        public void SetMaxDetectionDistance(float distance)
+        {
+            maxDetectionDistance = Mathf.Max(0f, distance);
+        }
+
+        public float MaxDetectionDistance => maxDetectionDistance;
+    }
+}

@@ -477,8 +477,8 @@ NavMeshAgent:
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
---- !u!65 &421529241
-BoxCollider:
+--- !u!136 &421529244
+CapsuleCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -495,9 +495,11 @@ BoxCollider:
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
+  serializedVersion: 2
+  m_Radius: 0.25
+  m_Height: 2.3497205
+  m_Direction: 1
+  m_Center: {x: 0, y: 0.67486024, z: 0}
 --- !u!1 &577790987
 GameObject:
   m_ObjectHideFlags: 0
@@ -758,15 +760,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 36078ab0369161e49a29d349ae3e0739,
         type: 3}
       insertIndex: -1
-      addedObject: {fileID: 421529241}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 36078ab0369161e49a29d349ae3e0739,
-        type: 3}
-      insertIndex: -1
       addedObject: {fileID: 421529240}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 36078ab0369161e49a29d349ae3e0739,
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 421529239}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 36078ab0369161e49a29d349ae3e0739,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 421529244}
   m_SourcePrefab: {fileID: 100100000, guid: 36078ab0369161e49a29d349ae3e0739, type: 3}
 --- !u!1 &886969605
 GameObject:
@@ -1144,6 +1146,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   viewCamera: {fileID: 0}
   eyeControl: {fileID: 0}
+  occlusionLayers:
+    serializedVersion: 2
+    m_Bits: 4294967291
   maxDetectionDistance: 20
 --- !u!114 &1710761704
 MonoBehaviour:
@@ -1308,6 +1313,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   viewCamera: {fileID: 1755271701}
   eyeControl: {fileID: 1710761704}
+  occlusionLayers:
+    serializedVersion: 2
+    m_Bits: 4294967291
   maxDetectionDistance: 999
 --- !u!114 &1755271703
 MonoBehaviour:
