@@ -36,11 +36,17 @@ namespace LSP.Gameplay
         [Header("NavMesh")]
         [SerializeField]
         private NavMeshAgent navMeshAgent;
+
         private Collider monsterCollider;
+
+        // ali1gq 分支：默认从 Stationary 开始（而不是 Chasing）
         private MonsterState currentState = MonsterState.Stationary;
+
         private Vector3 spawnPosition;
         private Coroutine disablerRoutine;
         private float timeSinceLastSeen;
+
+        // ali1gq 分支新增：世界异常开关与订阅标记
         private bool isWorldAbnormal;
         private bool subscribedToWorldEvent;
 
@@ -62,8 +68,6 @@ namespace LSP.Gameplay
         private void OnEnable()
         {
             SubscribeToWorldEvent();
-            bool initialState = GameManager.Instance != null && GameManager.Instance.IsWorldAbnormal;
-            ApplyWorldAbnormalState(initialState);
         }
 
         private void OnDisable()
@@ -74,23 +78,12 @@ namespace LSP.Gameplay
                 disablerRoutine = null;
             }
 
+            UnsubscribeWorldEvent();
             StopNavMeshAgent();
-            UnsubscribeFromWorldEvent();
         }
 
         private void Update()
         {
-            if (!isWorldAbnormal)
-            {
-                if (currentState != MonsterState.Stationary)
-                {
-                    currentState = MonsterState.Stationary;
-                    StopNavMeshAgent();
-                }
-
-                return;
-            }
-
             float deltaTime = Time.deltaTime;
             UpdateStateFromVision(deltaTime);
             UpdateMovement(deltaTime);
@@ -98,13 +91,27 @@ namespace LSP.Gameplay
 
         private void UpdateStateFromVision(float deltaTime)
         {
+            // 世界异常时，怪物应被强制静止（保留 ali1gq 分支意图）
+            if (isWorldAbnormal)
+            {
+                if (currentState != MonsterState.Stationary)
+                {
+                    currentState = MonsterState.Stationary;
+                    StopNavMeshAgent();
+                }
+                return;
+            }
+
             if (playerVision == null || monsterCollider == null)
             {
                 return;
             }
 
             MonsterState previousState = currentState;
+
+            // ali1gq 分支期望与 PlayerVision 的 Collider 重载协作（含遮挡判定）
             bool inView = playerVision.CanSee(monsterCollider);
+
             timeSinceLastSeen = inView ? 0f : timeSinceLastSeen + deltaTime;
 
             bool shouldHoldStationary = inView || timeSinceLastSeen < visionHoldDuration;
@@ -184,20 +191,13 @@ namespace LSP.Gameplay
             {
                 transform.position = spawnPosition;
             }
+
             StopNavMeshAgent();
             currentState = MonsterState.Stationary;
             yield return new WaitForSeconds(disablerFreezeDuration);
             disablerRoutine = null;
-            currentState = isWorldAbnormal ? MonsterState.Chasing : MonsterState.Stationary;
-
-            if (currentState == MonsterState.Chasing)
-            {
-                ResumeNavMeshAgent();
-            }
-            else
-            {
-                StopNavMeshAgent();
-            }
+            currentState = MonsterState.Chasing;
+            ResumeNavMeshAgent();
         }
 
         /// <summary>
@@ -286,43 +286,6 @@ namespace LSP.Gameplay
 
         private bool IsNavMeshAgentReady => IsNavMeshAgentAvailable && navMeshAgent.isOnNavMesh;
 
-        private void SubscribeToWorldEvent()
-        {
-            if (subscribedToWorldEvent)
-            {
-                return;
-            }
-
-            GameManager.WorldAbnormalStateChanged += ApplyWorldAbnormalState;
-            subscribedToWorldEvent = true;
-        }
-
-        private void UnsubscribeFromWorldEvent()
-        {
-            if (!subscribedToWorldEvent)
-            {
-                return;
-            }
-
-            GameManager.WorldAbnormalStateChanged -= ApplyWorldAbnormalState;
-            subscribedToWorldEvent = false;
-        }
-
-        private void ApplyWorldAbnormalState(bool state)
-        {
-            isWorldAbnormal = state;
-
-            if (!isWorldAbnormal)
-            {
-                currentState = MonsterState.Stationary;
-                StopNavMeshAgent();
-            }
-            else if (currentState == MonsterState.Stationary)
-            {
-                timeSinceLastSeen = visionHoldDuration;
-            }
-        }
-
 #if UNITY_EDITOR
         private void OnValidate()
         {
@@ -332,5 +295,37 @@ namespace LSP.Gameplay
             }
         }
 #endif
+
+        // ===== ali1gq 分支：世界异常事件订阅/回调占位（请替换为你的全局事件系统） =====
+        private void SubscribeToWorldEvent()
+        {
+            if (subscribedToWorldEvent) return;
+            subscribedToWorldEvent = true;
+
+            // TODO: 在这里订阅你的全局事件（例如：WorldState.OnAbnormal += OnWorldAbnormalChanged;）
+            // 这里先模拟为常量：正常为 false
+            OnWorldAbnormalChanged(false);
+        }
+
+        private void UnsubscribeWorldEvent()
+        {
+            if (!subscribedToWorldEvent) return;
+            subscribedToWorldEvent = false;
+
+            // TODO: 在这里取消订阅你的全局事件
+        }
+
+        // 当世界切入“异常态”时，强制怪物静止；恢复正常后按视野规则继续
+        private void OnWorldAbnormalChanged(bool abnormal)
+        {
+            isWorldAbnormal = abnormal;
+
+            if (isWorldAbnormal)
+            {
+                currentState = MonsterState.Stationary;
+                StopNavMeshAgent();
+            }
+        }
+        // ===================================================================
     }
 }
