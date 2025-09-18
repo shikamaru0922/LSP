@@ -78,6 +78,16 @@ namespace LSP.Gameplay
         [SerializeField]
         private float orthographicSizeMax = 20f;
 
+        [Header("Persistence")]
+        [Tooltip("File name used when persisting debug-tuned values. Stored under Application.persistentDataPath.")]
+        [SerializeField]
+        private string settingsFileName = "gameplay-debug-settings.json";
+
+        [Header("Cursor")]
+        [Tooltip("When enabled, the cursor is unlocked and made visible whenever the panel is open so designers can interact with the controls.")]
+        [SerializeField]
+        private bool unlockCursorWhileVisible = true;
+
         [Header("Audio Replacement")]
         [Tooltip("Clip that will be assigned to all managed audio sources when the replace button is pressed.")]
         [SerializeField]
@@ -90,6 +100,15 @@ namespace LSP.Gameplay
         private float cachedMasterVolume = 1f;
         private float cachedMonsterSpeed;
         private GUIStyle headerStyle;
+
+        // Persistence runtime cache
+        private GameplayDebugSettingsData persistedSettings;
+        private string settingsFilePath;
+
+        // Cursor state cache
+        private bool cursorStateCached;
+        private CursorLockMode previousCursorLock;
+        private bool previousCursorVisible;
 
         private void Awake()
         {
@@ -122,6 +141,10 @@ namespace LSP.Gameplay
             {
                 playerCamera = TryResolveCamera();
             }
+
+            settingsFilePath = GameplayDebugSettingsStore.ResolvePath(settingsFileName);
+            persistedSettings = GameplayDebugSettingsStore.Load(settingsFileName);
+            cachedMasterVolume = Mathf.Clamp(persistedSettings.MasterVolume, masterVolumeMin, masterVolumeMax);
         }
 
         private void Start()
@@ -135,6 +158,7 @@ namespace LSP.Gameplay
                 CacheAudioSources();
             }
 
+            ApplyPersistedSettings();
             SyncCachedValues();
         }
 
@@ -143,6 +167,7 @@ namespace LSP.Gameplay
             if (Input.GetKeyDown(toggleKey))
             {
                 isVisible = !isVisible;
+                UpdateCursorState();
             }
 
             RemoveDestroyedReferences();
@@ -150,6 +175,11 @@ namespace LSP.Gameplay
             if (managedAudioSources.Count > audioBaseVolumes.Count)
             {
                 CacheAudioSources();
+            }
+
+            if (unlockCursorWhileVisible)
+            {
+                UpdateCursorState();
             }
         }
 
@@ -191,6 +221,21 @@ namespace LSP.Gameplay
                 RefreshTrackedObjects();
             }
 
+            GUILayout.Space(12f);
+            GUILayout.Label($"Settings file: {settingsFilePath}");
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Save settings"))
+            {
+                SaveSettingsToDisk();
+            }
+
+            if (GUILayout.Button("Reload settings"))
+            {
+                ReloadSettingsFromDisk();
+            }
+            GUILayout.EndHorizontal();
+
             GUILayout.EndScrollView();
             GUI.DragWindow(new Rect(0f, 0f, 10000f, 20f));
         }
@@ -211,6 +256,7 @@ namespace LSP.Gameplay
             if (!Mathf.Approximately(newSpeed, currentSpeed))
             {
                 playerState.MovementSpeed = newSpeed;
+                persistedSettings.PlayerSpeed = newSpeed;
             }
 
             if (eyeControl != null)
@@ -263,6 +309,7 @@ namespace LSP.Gameplay
                 if (!Mathf.Approximately(newSize, currentSize))
                 {
                     playerCamera.orthographicSize = newSize;
+                    persistedSettings.CameraOrthographicSize = newSize;
                 }
             }
             else
@@ -272,6 +319,7 @@ namespace LSP.Gameplay
                 if (!Mathf.Approximately(newFov, currentFov))
                 {
                     playerCamera.fieldOfView = newFov;
+                    persistedSettings.CameraFieldOfView = newFov;
                 }
             }
         }
@@ -291,6 +339,7 @@ namespace LSP.Gameplay
             {
                 cachedMasterVolume = newVolume;
                 ApplyMasterVolume();
+                persistedSettings.MasterVolume = cachedMasterVolume;
             }
 
             GUILayout.Label($"Tracked Sources: {CountActiveAudioSources()}");
@@ -526,6 +575,8 @@ namespace LSP.Gameplay
             {
                 cachedMonsterSpeed = Mathf.Clamp(cachedMonsterSpeed, monsterSpeedMin, monsterSpeedMax);
             }
+
+            CaptureCurrentValuesForPersistence();
         }
 
         private Camera TryResolveCamera()
@@ -577,6 +628,125 @@ namespace LSP.Gameplay
                 }
 
                 monster.SetMoveSpeed(cachedMonsterSpeed);
+            }
+
+            persistedSettings.MonsterSpeed = cachedMonsterSpeed;
+        }
+
+        private void ApplyPersistedSettings()
+        {
+            if (persistedSettings == null)
+            {
+                persistedSettings = new GameplayDebugSettingsData();
+            }
+
+            if (playerState != null)
+            {
+                float playerSpeed = Mathf.Clamp(persistedSettings.PlayerSpeed, playerSpeedMin, playerSpeedMax);
+                playerState.MovementSpeed = playerSpeed;
+            }
+
+            float monsterSpeed = Mathf.Clamp(persistedSettings.MonsterSpeed, monsterSpeedMin, monsterSpeedMax);
+            if (trackedMonsters.Count > 0)
+            {
+                ApplyMonsterSpeed(monsterSpeed);
+            }
+            else
+            {
+                cachedMonsterSpeed = monsterSpeed;
+            }
+
+            if (playerCamera != null)
+            {
+                if (playerCamera.orthographic)
+                {
+                    playerCamera.orthographicSize = Mathf.Clamp(persistedSettings.CameraOrthographicSize, orthographicSizeMin, orthographicSizeMax);
+                }
+                else
+                {
+                    playerCamera.fieldOfView = Mathf.Clamp(persistedSettings.CameraFieldOfView, perspectiveFovMin, perspectiveFovMax);
+                }
+            }
+
+            cachedMasterVolume = Mathf.Clamp(persistedSettings.MasterVolume, masterVolumeMin, masterVolumeMax);
+            ApplyMasterVolume();
+        }
+
+        private void CaptureCurrentValuesForPersistence()
+        {
+            if (persistedSettings == null)
+            {
+                persistedSettings = new GameplayDebugSettingsData();
+            }
+
+            if (playerState != null)
+            {
+                persistedSettings.PlayerSpeed = playerState.MovementSpeed;
+            }
+
+            persistedSettings.MonsterSpeed = cachedMonsterSpeed;
+            persistedSettings.MasterVolume = cachedMasterVolume;
+
+            if (playerCamera != null)
+            {
+                if (playerCamera.orthographic)
+                {
+                    persistedSettings.CameraOrthographicSize = playerCamera.orthographicSize;
+                }
+                else
+                {
+                    persistedSettings.CameraFieldOfView = playerCamera.fieldOfView;
+                }
+            }
+        }
+
+        private void SaveSettingsToDisk()
+        {
+            CaptureCurrentValuesForPersistence();
+            GameplayDebugSettingsStore.Save(persistedSettings, settingsFileName);
+        }
+
+        private void ReloadSettingsFromDisk()
+        {
+            persistedSettings = GameplayDebugSettingsStore.Load(settingsFileName);
+            ApplyPersistedSettings();
+            SyncCachedValues();
+        }
+
+        private void UpdateCursorState()
+        {
+            if (!unlockCursorWhileVisible)
+            {
+                return;
+            }
+
+            if (isVisible)
+            {
+                if (!cursorStateCached)
+                {
+                    previousCursorLock = Cursor.lockState;
+                    previousCursorVisible = Cursor.visible;
+                    cursorStateCached = true;
+                }
+
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
+            else if (cursorStateCached)
+            {
+                Cursor.lockState = previousCursorLock;
+                Cursor.visible = previousCursorVisible;
+                cursorStateCached = false;
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (cursorStateCached)
+            {
+                Cursor.lockState = previousCursorLock;
+                Cursor.visible = previousCursorVisible;
+                cursorStateCached = false;
             }
         }
     }
