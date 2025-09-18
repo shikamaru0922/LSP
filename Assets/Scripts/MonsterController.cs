@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
@@ -17,6 +18,11 @@ namespace LSP.Gameplay
     [RequireComponent(typeof(NavMeshAgent))]
     public class MonsterController : MonoBehaviour
     {
+        /// <summary>
+        /// Raised whenever the monster is reset by the disabler device.
+        /// </summary>
+        public static event Action<MonsterController> MonsterReset;
+
         [SerializeField]
         private Transform chaseTarget;
 
@@ -188,6 +194,7 @@ namespace LSP.Gameplay
 
             StopNavMeshAgent();
             currentState = MonsterState.Stationary;
+            MonsterReset?.Invoke(this);
             yield return new WaitForSeconds(disablerFreezeDuration);
             disablerRoutine = null;
             currentState = isWorldAbnormal ? MonsterState.Chasing : MonsterState.Stationary;
