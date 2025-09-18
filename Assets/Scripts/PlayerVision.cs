@@ -75,18 +75,16 @@ namespace LSP.Gameplay
                 return false;
             }
 
-            if (maxDetectionDistance <= 0f)
+            if (maxDetectionDistance > 0f)
             {
-                return HasLineOfSight(bounds, targetCollider);
-            }
-
-            Vector3 viewerPosition = viewCamera.transform.position;
-            Vector3 closestPoint = bounds.ClosestPoint(viewerPosition);
-            float sqrDistance = (closestPoint - viewerPosition).sqrMagnitude;
-            float sqrRange = maxDetectionDistance * maxDetectionDistance;
-            if (sqrDistance > sqrRange)
-            {
-                return false;
+                Vector3 viewerPosition = viewCamera.transform.position;
+                Vector3 closestPoint = bounds.ClosestPoint(viewerPosition);
+                float sqrDistance = (closestPoint - viewerPosition).sqrMagnitude;
+                float sqrRange = maxDetectionDistance * maxDetectionDistance;
+                if (sqrDistance > sqrRange)
+                {
+                    return false;
+                }
             }
 
             return HasLineOfSight(bounds, targetCollider);
@@ -96,6 +94,7 @@ namespace LSP.Gameplay
         {
             if (occlusionLayers == 0)
             {
+                // Empty mask disables occlusion testing
                 return true;
             }
 
@@ -115,15 +114,18 @@ namespace LSP.Gameplay
 
                 if (!Physics.Raycast(viewerPosition, direction / distance, out RaycastHit hit, distance, occlusionLayers, QueryTriggerInteraction.Ignore))
                 {
+                    // Nothing hit: line of sight is clear
                     return true;
                 }
 
+                // If we hit the target (or its hierarchy), that's also clear
                 if (targetCollider != null && IsPartOfTarget(hit.collider, targetCollider))
                 {
                     return true;
                 }
             }
 
+            // All samples blocked by non-target geometry
             return false;
         }
 
@@ -141,30 +143,22 @@ namespace LSP.Gameplay
 
             Transform hitTransform = hitCollider.transform;
             Transform targetTransform = targetCollider.transform;
-            return hitTransform == targetTransform || hitTransform.IsChildOf(targetTransform) || targetTransform.IsChildOf(hitTransform) || hitTransform.root == targetTransform.root;
+            return hitTransform == targetTransform
+                   || hitTransform.IsChildOf(targetTransform)
+                   || targetTransform.IsChildOf(hitTransform)
+                   || hitTransform.root == targetTransform.root;
         }
 
         private static readonly Vector3[] OcclusionSampleOffsets =
         {
             Vector3.zero,
-            Vector3.right,
-            Vector3.left,
-            Vector3.up,
-            Vector3.down,
-            Vector3.forward,
-            Vector3.back,
-            new Vector3(1f, 1f, 0f),
-            new Vector3(1f, -1f, 0f),
-            new Vector3(-1f, 1f, 0f),
-            new Vector3(-1f, -1f, 0f),
-            new Vector3(1f, 0f, 1f),
-            new Vector3(1f, 0f, -1f),
-            new Vector3(-1f, 0f, 1f),
-            new Vector3(-1f, 0f, -1f),
-            new Vector3(0f, 1f, 1f),
-            new Vector3(0f, 1f, -1f),
-            new Vector3(0f, -1f, 1f),
-            new Vector3(0f, -1f, -1f)
+            Vector3.right, Vector3.left, Vector3.up, Vector3.down, Vector3.forward, Vector3.back,
+            new Vector3(1f, 1f, 0f),  new Vector3(1f, -1f, 0f),
+            new Vector3(-1f, 1f, 0f), new Vector3(-1f, -1f, 0f),
+            new Vector3(1f, 0f, 1f),  new Vector3(1f, 0f, -1f),
+            new Vector3(-1f, 0f, 1f), new Vector3(-1f, 0f, -1f),
+            new Vector3(0f, 1f, 1f),  new Vector3(0f, 1f, -1f),
+            new Vector3(0f, -1f, 1f), new Vector3(0f, -1f, -1f)
         };
 
         private void CacheFrustumPlanes()
@@ -192,30 +186,4 @@ namespace LSP.Gameplay
         /// <summary>
         /// Injects the eye control dependency at runtime, allowing prefabs with
         /// pre-configured controllers to provide their existing component.
-        /// </summary>
-        public void SetEyeControl(PlayerEyeControl control)
-        {
-            eyeControl = control;
-        }
-
-        /// <summary>
-        /// Overrides the set of layers considered for line-of-sight checks.
-        /// Providing an empty mask disables occlusion testing entirely.
-        /// </summary>
-        public void SetOcclusionLayers(LayerMask layers)
-        {
-            occlusionLayers = layers;
-        }
-
-        /// <summary>
-        /// Allows runtime systems to override the maximum vision distance.
-        /// Setting the value to zero or below removes the distance limit.
-        /// </summary>
-        public void SetMaxDetectionDistance(float distance)
-        {
-            maxDetectionDistance = Mathf.Max(0f, distance);
-        }
-
-        public float MaxDetectionDistance => maxDetectionDistance;
-    }
-}
+        /// </summar
