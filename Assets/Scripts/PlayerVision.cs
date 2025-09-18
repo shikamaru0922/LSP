@@ -54,5 +54,25 @@ namespace LSP.Gameplay
             cachedPlanes = GeometryUtility.CalculateFrustumPlanes(viewCamera);
             cachedFrame = Time.frameCount;
         }
+
+        /// <summary>
+        /// Overrides the camera used to determine the player's field of view.
+        /// This is useful when wiring the script to an existing prefab that already
+        /// manages its own camera hierarchy.
+        /// </summary>
+        public void SetViewCamera(Camera camera)
+        {
+            viewCamera = camera;
+            cachedFrame = -1;
+        }
+
+        /// <summary>
+        /// Injects the eye control dependency at runtime, allowing prefabs with
+        /// pre-configured controllers to provide their existing component.
+        /// </summary>
+        public void SetEyeControl(PlayerEyeControl control)
+        {
+            eyeControl = control;
+        }
     }
 }
