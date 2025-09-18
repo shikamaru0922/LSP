@@ -1,9 +1,6 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-
 using UnityEngine.AI;
-using LSP.Gameplay.Navigation;
 
 namespace LSP.Gameplay
 {
@@ -17,33 +14,18 @@ namespace LSP.Gameplay
     /// Implements the chase / gaze behaviour loop of the monster.
     /// </summary>
     [RequireComponent(typeof(Collider))]
+    [RequireComponent(typeof(NavMeshAgent))]
     public class MonsterController : MonoBehaviour
     {
-        [SerializeField]
-        private float chaseSpeed = 2.5f;
-
         [SerializeField]
         private Transform chaseTarget;
 
         [SerializeField]
         private PlayerVision playerVision;
 
-
-        [Header("Navigation")]
-        [Tooltip("Graph used to build A* paths toward the player while chasing.")]
-        [SerializeField]
-        private AStarNavigationGraph navigationGraph;
-
-        [SerializeField]
-        private float repathInterval = 0.75f;
-
-        [SerializeField]
-        private float waypointTolerance = 0.25f;
-
         [Tooltip("How long the monster stays frozen after being hit by the disabler.")]
         [SerializeField]
         private float disablerFreezeDuration = 5f;
-
 
         [Header("Vision Handling")]
         [Tooltip("How long the monster stays frozen after briefly leaving the player's view.")]
@@ -51,20 +33,15 @@ namespace LSP.Gameplay
         [SerializeField]
         private float visionHoldDuration = 0.2f;
 
-        [Header("NavMesh (reserved)")]
+        [Header("NavMesh")]
         [SerializeField]
         private NavMeshAgent navMeshAgent;
-
-        private readonly List<Vector3> currentPath = new List<Vector3>();
 
         private Collider monsterCollider;
         private MonsterState currentState = MonsterState.Chasing;
         private Vector3 spawnPosition;
         private Coroutine disablerRoutine;
-        private float repathTimer;
-        private int currentPathIndex;
         private float timeSinceLastSeen;
-
 
         public MonsterState CurrentState => currentState;
 
@@ -73,16 +50,13 @@ namespace LSP.Gameplay
             monsterCollider = GetComponent<Collider>();
             spawnPosition = transform.position;
 
-
             if (navMeshAgent == null)
             {
                 navMeshAgent = GetComponent<NavMeshAgent>();
             }
 
-            SyncNavMeshAgentSettings();
             timeSinceLastSeen = visionHoldDuration;
         }
-
 
         private void OnDisable()
         {
@@ -92,7 +66,7 @@ namespace LSP.Gameplay
                 disablerRoutine = null;
             }
 
-            ClearPath();
+            StopNavMeshAgent();
         }
 
         private void Update()
@@ -103,7 +77,6 @@ namespace LSP.Gameplay
         }
 
         private void UpdateStateFromVision(float deltaTime)
-
         {
             if (playerVision == null || monsterCollider == null)
             {
@@ -117,11 +90,8 @@ namespace LSP.Gameplay
             bool shouldHoldStationary = inView || timeSinceLastSeen < visionHoldDuration;
             currentState = shouldHoldStationary ? MonsterState.Stationary : MonsterState.Chasing;
 
-
             if (currentState != previousState && currentState == MonsterState.Stationary)
             {
-                ClearPath();
-
                 StopNavMeshAgent();
             }
             else if (currentState != previousState && currentState == MonsterState.Chasing)
@@ -134,7 +104,6 @@ namespace LSP.Gameplay
         {
             if (currentState != MonsterState.Chasing || chaseTarget == null)
             {
-
                 StopNavMeshAgent();
                 return;
             }
@@ -142,28 +111,11 @@ namespace LSP.Gameplay
             if (IsNavMeshAgentReady)
             {
                 navMeshAgent.isStopped = false;
-                navMeshAgent.speed = chaseSpeed;
                 navMeshAgent.SetDestination(chaseTarget.position);
                 return;
             }
 
-
-            if (navigationGraph != null)
-            {
-                repathTimer -= deltaTime;
-                if (repathTimer <= 0f)
-                {
-                    RebuildPath();
-                    repathTimer = repathInterval;
-                }
-
-                FollowPath(deltaTime);
-            }
-            else
-            {
-                MoveDirectly(deltaTime);
-            }
-
+            MoveDirectly(deltaTime);
         }
 
         private void OnTriggerEnter(Collider other)
@@ -178,12 +130,10 @@ namespace LSP.Gameplay
                 player = other.GetComponentInParent<PlayerStateController>();
             }
 
-
             if (player != null)
             {
                 player.Kill();
             }
-
         }
 
         /// <summary>
@@ -215,14 +165,12 @@ namespace LSP.Gameplay
                 transform.position = spawnPosition;
             }
 
-
-            ClearPath();
+            StopNavMeshAgent();
             currentState = MonsterState.Stationary;
             yield return new WaitForSeconds(disablerFreezeDuration);
             disablerRoutine = null;
             currentState = MonsterState.Chasing;
             ResumeNavMeshAgent();
-
         }
 
         /// <summary>
@@ -231,7 +179,6 @@ namespace LSP.Gameplay
         public void SetTarget(Transform target)
         {
             chaseTarget = target;
-            ClearPath();
 
             if (currentState == MonsterState.Chasing)
             {
@@ -241,7 +188,6 @@ namespace LSP.Gameplay
             {
                 StopNavMeshAgent();
             }
-
         }
 
         public void SetPlayerVision(PlayerVision vision)
@@ -249,71 +195,18 @@ namespace LSP.Gameplay
             playerVision = vision;
         }
 
-        public void SetNavigationGraph(AStarNavigationGraph graph)
-        {
-            navigationGraph = graph;
-            ClearPath();
-        }
-
         public void SetNavMeshAgent(NavMeshAgent agent)
         {
             navMeshAgent = agent;
-            SyncNavMeshAgentSettings();
 
-        }
-
-        private void RebuildPath()
-        {
-            if (navigationGraph == null || chaseTarget == null)
+            if (currentState == MonsterState.Chasing)
             {
-                return;
-            }
-
-            if (navigationGraph.TryBuildPath(transform.position, chaseTarget.position, currentPath))
-            {
-                currentPathIndex = 0;
+                ResumeNavMeshAgent();
             }
             else
             {
-                currentPath.Clear();
-                currentPathIndex = 0;
+                StopNavMeshAgent();
             }
-        }
-
-        private void FollowPath(float deltaTime)
-        {
-            if (currentPath.Count == 0)
-            {
-                MoveDirectly(deltaTime);
-                return;
-            }
-
-            Vector3 targetPosition = currentPath[Mathf.Clamp(currentPathIndex, 0, currentPath.Count - 1)];
-            Vector3 toTarget = targetPosition - transform.position;
-            toTarget.y = 0f;
-
-            if (toTarget.sqrMagnitude <= waypointTolerance * waypointTolerance)
-            {
-                currentPathIndex++;
-                if (currentPathIndex >= currentPath.Count)
-                {
-                    currentPath.Clear();
-                    MoveDirectly(deltaTime);
-                    return;
-                }
-
-                targetPosition = currentPath[currentPathIndex];
-                toTarget = targetPosition - transform.position;
-                toTarget.y = 0f;
-            }
-
-            if (toTarget.sqrMagnitude <= 0.0001f)
-            {
-                return;
-            }
-
-            Vector3 direction = toTarget.normalized;
-            transform.position += direction * chaseSpeed * deltaTime;
         }
 
         private void MoveDirectly(float deltaTime)
@@ -326,20 +219,8 @@ namespace LSP.Gameplay
                 return;
             }
 
-            transform.position += direction.normalized * chaseSpeed * deltaTime;
-        }
-
-        private void ClearPath()
-        {
-            currentPath.Clear();
-            currentPathIndex = 0;
-            repathTimer = 0f;
-
-
-            if (IsNavMeshAgentReady)
-            {
-                navMeshAgent.ResetPath();
-            }
+            float speed = navMeshAgent != null ? navMeshAgent.speed : 0f;
+            transform.position += direction.normalized * speed * deltaTime;
         }
 
         private void StopNavMeshAgent()
@@ -350,10 +231,12 @@ namespace LSP.Gameplay
             }
 
             navMeshAgent.isStopped = true;
+            navMeshAgent.velocity = Vector3.zero;
 
             if (navMeshAgent.isOnNavMesh)
             {
                 navMeshAgent.ResetPath();
+                navMeshAgent.nextPosition = transform.position;
             }
         }
 
@@ -366,19 +249,10 @@ namespace LSP.Gameplay
 
             if (navMeshAgent.isOnNavMesh)
             {
+                navMeshAgent.nextPosition = transform.position;
                 navMeshAgent.isStopped = false;
-                navMeshAgent.speed = chaseSpeed;
+                navMeshAgent.velocity = Vector3.zero;
             }
-        }
-
-        private void SyncNavMeshAgentSettings()
-        {
-            if (!IsNavMeshAgentAvailable)
-            {
-                return;
-            }
-
-            navMeshAgent.speed = chaseSpeed;
         }
 
         private bool IsNavMeshAgentAvailable => navMeshAgent != null && navMeshAgent.enabled;
@@ -392,10 +266,7 @@ namespace LSP.Gameplay
             {
                 navMeshAgent = GetComponent<NavMeshAgent>();
             }
-
-            SyncNavMeshAgentSettings();
         }
 #endif
-
     }
 }

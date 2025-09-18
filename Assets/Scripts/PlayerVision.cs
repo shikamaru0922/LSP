@@ -17,7 +17,6 @@ namespace LSP.Gameplay
         [SerializeField]
         private float maxDetectionDistance = 999f;
 
-
         private Plane[] cachedPlanes;
         private int cachedFrame = -1;
 
