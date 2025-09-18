@@ -188,7 +188,7 @@ namespace LSP.Gameplay
             CacheBehaviourStates();
             DisableBehaviours();
             CacheAnimatorState();
-            DisableAnimator();
+            DisableAnimator(); // 直接禁用 Animator 组件
         }
 
         private void ExitDeadStare()

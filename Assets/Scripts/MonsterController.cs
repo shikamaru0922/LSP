@@ -40,6 +40,7 @@ namespace LSP.Gameplay
         [Tooltip("Fallback speed used when the monster is moved directly because the NavMeshAgent is unavailable.")]
         [SerializeField]
         private float fallbackMoveSpeed = 2.5f;
+
         private Collider monsterCollider;
         private MonsterState currentState = MonsterState.Stationary;
         private Vector3 spawnPosition;
@@ -61,6 +62,7 @@ namespace LSP.Gameplay
                 navMeshAgent = GetComponent<NavMeshAgent>();
             }
 
+            // 同步直线移动与 NavMesh 的速度
             if (navMeshAgent != null && navMeshAgent.speed > 0f)
             {
                 fallbackMoveSpeed = navMeshAgent.speed;
@@ -198,6 +200,7 @@ namespace LSP.Gameplay
             {
                 transform.position = spawnPosition;
             }
+
             StopNavMeshAgent();
             currentState = MonsterState.Stationary;
             yield return new WaitForSeconds(disablerFreezeDuration);
