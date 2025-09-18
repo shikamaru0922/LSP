@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+
 using UnityEngine.AI;
 using LSP.Gameplay.Navigation;
 
@@ -27,6 +28,7 @@ namespace LSP.Gameplay
         [SerializeField]
         private PlayerVision playerVision;
 
+
         [Header("Navigation")]
         [Tooltip("Graph used to build A* paths toward the player while chasing.")]
         [SerializeField]
@@ -42,6 +44,7 @@ namespace LSP.Gameplay
         [SerializeField]
         private float disablerFreezeDuration = 5f;
 
+
         [Header("Vision Handling")]
         [Tooltip("How long the monster stays frozen after briefly leaving the player's view.")]
         [Min(0f)]
@@ -53,6 +56,7 @@ namespace LSP.Gameplay
         private NavMeshAgent navMeshAgent;
 
         private readonly List<Vector3> currentPath = new List<Vector3>();
+
         private Collider monsterCollider;
         private MonsterState currentState = MonsterState.Chasing;
         private Vector3 spawnPosition;
@@ -61,12 +65,14 @@ namespace LSP.Gameplay
         private int currentPathIndex;
         private float timeSinceLastSeen;
 
+
         public MonsterState CurrentState => currentState;
 
         private void Awake()
         {
             monsterCollider = GetComponent<Collider>();
             spawnPosition = transform.position;
+
 
             if (navMeshAgent == null)
             {
@@ -76,6 +82,7 @@ namespace LSP.Gameplay
             SyncNavMeshAgentSettings();
             timeSinceLastSeen = visionHoldDuration;
         }
+
 
         private void OnDisable()
         {
@@ -96,6 +103,7 @@ namespace LSP.Gameplay
         }
 
         private void UpdateStateFromVision(float deltaTime)
+
         {
             if (playerVision == null || monsterCollider == null)
             {
@@ -109,9 +117,11 @@ namespace LSP.Gameplay
             bool shouldHoldStationary = inView || timeSinceLastSeen < visionHoldDuration;
             currentState = shouldHoldStationary ? MonsterState.Stationary : MonsterState.Chasing;
 
+
             if (currentState != previousState && currentState == MonsterState.Stationary)
             {
                 ClearPath();
+
                 StopNavMeshAgent();
             }
             else if (currentState != previousState && currentState == MonsterState.Chasing)
@@ -124,6 +134,7 @@ namespace LSP.Gameplay
         {
             if (currentState != MonsterState.Chasing || chaseTarget == null)
             {
+
                 StopNavMeshAgent();
                 return;
             }
@@ -135,6 +146,7 @@ namespace LSP.Gameplay
                 navMeshAgent.SetDestination(chaseTarget.position);
                 return;
             }
+
 
             if (navigationGraph != null)
             {
@@ -151,6 +163,7 @@ namespace LSP.Gameplay
             {
                 MoveDirectly(deltaTime);
             }
+
         }
 
         private void OnTriggerEnter(Collider other)
@@ -165,10 +178,12 @@ namespace LSP.Gameplay
                 player = other.GetComponentInParent<PlayerStateController>();
             }
 
+
             if (player != null)
             {
                 player.Kill();
             }
+
         }
 
         /// <summary>
@@ -199,12 +214,15 @@ namespace LSP.Gameplay
             {
                 transform.position = spawnPosition;
             }
+
+
             ClearPath();
             currentState = MonsterState.Stationary;
             yield return new WaitForSeconds(disablerFreezeDuration);
             disablerRoutine = null;
             currentState = MonsterState.Chasing;
             ResumeNavMeshAgent();
+
         }
 
         /// <summary>
@@ -223,6 +241,7 @@ namespace LSP.Gameplay
             {
                 StopNavMeshAgent();
             }
+
         }
 
         public void SetPlayerVision(PlayerVision vision)
@@ -240,6 +259,7 @@ namespace LSP.Gameplay
         {
             navMeshAgent = agent;
             SyncNavMeshAgentSettings();
+
         }
 
         private void RebuildPath()
@@ -315,6 +335,7 @@ namespace LSP.Gameplay
             currentPathIndex = 0;
             repathTimer = 0f;
 
+
             if (IsNavMeshAgentReady)
             {
                 navMeshAgent.ResetPath();
@@ -375,5 +396,6 @@ namespace LSP.Gameplay
             SyncNavMeshAgentSettings();
         }
 #endif
+
     }
 }
