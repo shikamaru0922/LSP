@@ -5,6 +5,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assembly-CSharp", "Assembly
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assembly-CSharp-Editor", "Assembly-CSharp-Editor.csproj", "{db449c22-bc8c-ae11-0cdf-115d8a3cca32}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.StarterAssets", "Unity.StarterAssets.csproj", "{45bc09df-d875-04e1-11be-f7945e79f6ff}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.StarterAssets.Editor", "Unity.StarterAssets.Editor.csproj", "{355b459a-bb45-0cf9-f398-c5c8bf46744c}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "URPWizard", "URPWizard.csproj", "{0a89d2c5-57fe-5270-3e55-db1babd34f6a}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +20,12 @@ Global
 		{e60b48da-e913-2d39-c1f9-4603e1aab433}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{db449c22-bc8c-ae11-0cdf-115d8a3cca32}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{db449c22-bc8c-ae11-0cdf-115d8a3cca32}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45bc09df-d875-04e1-11be-f7945e79f6ff}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45bc09df-d875-04e1-11be-f7945e79f6ff}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{355b459a-bb45-0cf9-f398-c5c8bf46744c}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{355b459a-bb45-0cf9-f398-c5c8bf46744c}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0a89d2c5-57fe-5270-3e55-db1babd34f6a}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0a89d2c5-57fe-5270-3e55-db1babd34f6a}.Debug|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

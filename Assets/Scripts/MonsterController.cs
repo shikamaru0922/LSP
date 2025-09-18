@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using LSP.Gameplay.Navigation;
+using UnityEngine;
 
 namespace LSP.Gameplay
 {
@@ -26,6 +27,7 @@ namespace LSP.Gameplay
         [SerializeField]
         private PlayerVision playerVision;
 
+
         [Header("Navigation")]
         [Tooltip("Graph used to build A* paths toward the player while chasing.")]
         [SerializeField]
@@ -41,13 +43,17 @@ namespace LSP.Gameplay
         [SerializeField]
         private float disablerFreezeDuration = 5f;
 
+
         private readonly List<Vector3> currentPath = new List<Vector3>();
+
         private Collider monsterCollider;
         private MonsterState currentState = MonsterState.Chasing;
         private Vector3 spawnPosition;
         private Coroutine disablerRoutine;
+
         private float repathTimer;
         private int currentPathIndex;
+
 
         public MonsterState CurrentState => currentState;
 
@@ -56,6 +62,7 @@ namespace LSP.Gameplay
             monsterCollider = GetComponent<Collider>();
             spawnPosition = transform.position;
         }
+
 
         private void OnDisable()
         {
@@ -81,6 +88,7 @@ namespace LSP.Gameplay
                 return;
             }
 
+
             MonsterState previousState = currentState;
             bool inView = playerVision.CanSee(monsterCollider.bounds);
             currentState = inView ? MonsterState.Stationary : MonsterState.Chasing;
@@ -89,6 +97,10 @@ namespace LSP.Gameplay
             {
                 ClearPath();
             }
+
+            bool inView = playerVision.CanSee(monsterCollider.bounds);
+            currentState = inView ? MonsterState.Stationary : MonsterState.Chasing;
+
         }
 
         private void UpdateMovement(float deltaTime)
@@ -97,6 +109,7 @@ namespace LSP.Gameplay
             {
                 return;
             }
+
 
             if (navigationGraph != null)
             {
@@ -113,6 +126,10 @@ namespace LSP.Gameplay
             {
                 MoveDirectly(deltaTime);
             }
+
+            Vector3 direction = (chaseTarget.position - transform.position).normalized;
+            transform.position += direction * chaseSpeed * deltaTime;
+
         }
 
         private void OnTriggerEnter(Collider other)
@@ -128,6 +145,7 @@ namespace LSP.Gameplay
             }
 
             if (player != null)
+            if (other.TryGetComponent<PlayerStateController>(out var player))
             {
                 player.Kill();
             }
