@@ -16,8 +16,8 @@ namespace LSP.Gameplay
         public static event Action<bool> WorldAbnormalStateChanged;
 
         [SerializeField]
-        [Tooltip("Whether the world abnormal event starts enabled when the scene loads.")]
-        private bool startWorldAbnormal;
+        [Tooltip("Controls whether the world abnormal event is active. Can be toggled at runtime for testing.")]
+        private bool worldAbnormal;
 
         private bool isWorldAbnormal;
 
@@ -46,7 +46,7 @@ namespace LSP.Gameplay
             }
 
             instance = this;
-            SetWorldAbnormalState(startWorldAbnormal, true);
+            SetWorldAbnormalState(worldAbnormal, true);
         }
 
         /// <summary>
@@ -73,8 +73,21 @@ namespace LSP.Gameplay
             }
 
             isWorldAbnormal = value;
+            worldAbnormal = value;
             WorldAbnormalStateChanged?.Invoke(isWorldAbnormal);
         }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (!Application.isPlaying)
+            {
+                return;
+            }
+
+            SetWorldAbnormalState(worldAbnormal, false);
+        }
+#endif
 
         private void OnDestroy()
         {

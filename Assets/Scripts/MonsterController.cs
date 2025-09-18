@@ -321,6 +321,7 @@ namespace LSP.Gameplay
             }
             else if (currentState == MonsterState.Stationary)
             {
+                // Give it a small grace so it won't immediately chase until it has been out of sight for visionHoldDuration
                 timeSinceLastSeen = visionHoldDuration;
             }
         }
