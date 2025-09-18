@@ -9,34 +9,25 @@ namespace LSP.Gameplay
         DeadStare
     }
 
-    /// <summary>
-    /// Drives the "dead stare" event behaviour on NPCs by stopping their movement and
-    /// animators, then rotating the head to continuously face the player.
-    /// </summary>
     public class NpcDeadStareController : MonoBehaviour
     {
-        [SerializeField]
-        private Transform headTransform;
-
-        [SerializeField]
-        private Transform playerTransform;
-
-        [SerializeField]
-        private Animator animator;
+        [SerializeField] private Transform headTransform;
+        [SerializeField] private Transform playerTransform;
+        [SerializeField] private Animator animator;
 
         [Tooltip("Optional behaviours that should be disabled when entering the dead stare state.")]
-        [SerializeField]
-        private List<Behaviour> behavioursToDisable = new List<Behaviour>();
+        [SerializeField] private List<Behaviour> behavioursToDisable = new List<Behaviour>();
 
         [Tooltip("Degrees per second used when rotating the head to follow the player.")]
-        [Min(0f)]
-        [SerializeField]
-        private float headTurnSpeed = 360f;
+        [Min(0f)][SerializeField] private float headTurnSpeed = 360f;
 
         private NpcState currentState = NpcState.Normal;
         private readonly List<bool> cachedBehaviourStates = new List<bool>();
-        private float originalAnimatorSpeed = 1f;
-        private bool originalAnimatorEnabled = true;
+
+        // 新增：缓存 Animator 的启用状态 + 速度
+        private bool  originalAnimatorEnabled = true;
+        private float originalAnimatorSpeed   = 1f;
+
         private bool isSubscribed;
         private bool hasCachedWorldState;
         private bool lastKnownWorldAbnormal;
@@ -45,34 +36,17 @@ namespace LSP.Gameplay
 
         private void Awake()
         {
-            if (animator == null)
-            {
-                animator = GetComponentInChildren<Animator>();
-            }
-
-            if (headTransform == null && animator != null)
-            {
-                headTransform = animator.transform;
-            }
-
+            if (animator == null) animator = GetComponentInChildren<Animator>();
+            if (headTransform == null && animator != null) headTransform = animator.transform;
             CacheBehaviourStates();
-
-            if (animator != null)
-            {
-                originalAnimatorSpeed = animator.speed;
-                originalAnimatorEnabled = animator.enabled;
-            }
         }
 
         private void Start()
         {
             if (playerTransform == null)
             {
-                PlayerStateController playerState = FindObjectOfType<PlayerStateController>();
-                if (playerState != null)
-                {
-                    playerTransform = playerState.transform;
-                }
+                var playerState = FindObjectOfType<PlayerStateController>();
+                if (playerState != null) playerTransform = playerState.transform;
             }
         }
 
@@ -86,7 +60,7 @@ namespace LSP.Gameplay
         {
             UnsubscribeFromManager();
             RestoreBehaviours();
-            RestoreAnimatorState();
+            RestoreAnimatorState();       // 恢复 Animator 的 enabled + speed
             currentState = NpcState.Normal;
             hasCachedWorldState = false;
         }
@@ -95,21 +69,11 @@ namespace LSP.Gameplay
         {
             RefreshWorldState(false);
 
-            if (currentState != NpcState.DeadStare)
-            {
-                return;
-            }
-
-            if (headTransform == null || playerTransform == null)
-            {
-                return;
-            }
+            if (currentState != NpcState.DeadStare) return;
+            if (headTransform == null || playerTransform == null) return;
 
             Vector3 toPlayer = playerTransform.position - headTransform.position;
-            if (toPlayer.sqrMagnitude <= Mathf.Epsilon)
-            {
-                return;
-            }
+            if (toPlayer.sqrMagnitude <= Mathf.Epsilon) return;
 
             Quaternion targetRotation = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
             headTransform.rotation = Quaternion.RotateTowards(headTransform.rotation, targetRotation, headTurnSpeed * Time.deltaTime);
@@ -118,30 +82,20 @@ namespace LSP.Gameplay
         private void CacheBehaviourStates()
         {
             cachedBehaviourStates.Clear();
-            foreach (Behaviour behaviour in behavioursToDisable)
-            {
+            foreach (var behaviour in behavioursToDisable)
                 cachedBehaviourStates.Add(behaviour != null && behaviour.enabled);
-            }
         }
 
         private void SubscribeToManager()
         {
-            if (isSubscribed)
-            {
-                return;
-            }
-
+            if (isSubscribed) return;
             GameManager.WorldAbnormalStateChanged += ApplyWorldState;
             isSubscribed = true;
         }
 
         private void UnsubscribeFromManager()
         {
-            if (!isSubscribed)
-            {
-                return;
-            }
-
+            if (!isSubscribed) return;
             GameManager.WorldAbnormalStateChanged -= ApplyWorldState;
             isSubscribed = false;
         }
@@ -159,28 +113,16 @@ namespace LSP.Gameplay
             bool managerState = manager != null && manager.IsWorldAbnormal;
 
             if (!hasCachedWorldState || forceApply || managerState != lastKnownWorldAbnormal)
-            {
                 ApplyWorldState(managerState);
-            }
         }
 
         private void SetState(NpcState newState)
         {
-            if (currentState == newState)
-            {
-                return;
-            }
+            if (currentState == newState) return;
 
             currentState = newState;
-
-            if (currentState == NpcState.DeadStare)
-            {
-                EnterDeadStare();
-            }
-            else
-            {
-                ExitDeadStare();
-            }
+            if (currentState == NpcState.DeadStare) EnterDeadStare();
+            else                                     ExitDeadStare();
         }
 
         private void EnterDeadStare()
@@ -188,83 +130,59 @@ namespace LSP.Gameplay
             CacheBehaviourStates();
             DisableBehaviours();
             CacheAnimatorState();
-            DisableAnimator();
+            DisableAnimator();               // ★ 直接禁用 Animator 组件
         }
 
         private void ExitDeadStare()
         {
             RestoreBehaviours();
-            RestoreAnimatorState();
+            RestoreAnimatorState();          // 还原 enabled 与 speed
         }
 
         private void DisableBehaviours()
         {
             for (int i = 0; i < behavioursToDisable.Count; i++)
-            {
-                Behaviour behaviour = behavioursToDisable[i];
-                if (behaviour != null)
-                {
-                    behaviour.enabled = false;
-                }
-            }
+                if (behavioursToDisable[i] != null)
+                    behavioursToDisable[i].enabled = false;
         }
 
         private void RestoreBehaviours()
         {
             for (int i = 0; i < behavioursToDisable.Count; i++)
             {
-                Behaviour behaviour = behavioursToDisable[i];
-                if (behaviour == null)
-                {
-                    continue;
-                }
-
+                var behaviour = behavioursToDisable[i];
+                if (behaviour == null) continue;
                 bool enabledState = i < cachedBehaviourStates.Count && cachedBehaviourStates[i];
                 behaviour.enabled = enabledState;
             }
         }
 
+        // ===== Animator 状态管理（enabled + speed）=====
         private void CacheAnimatorState()
         {
-            if (animator != null)
-            {
-                originalAnimatorSpeed = animator.speed;
-                originalAnimatorEnabled = animator.enabled;
-            }
+            if (animator == null) return;
+            originalAnimatorEnabled = animator.enabled;
+            originalAnimatorSpeed   = animator.speed;
         }
 
         private void DisableAnimator()
         {
-            if (animator != null)
-            {
-                animator.enabled = false;
-                animator.speed = 0f;
-            }
+            if (animator == null) return;
+            animator.enabled = false;   // 彻底禁用
+            animator.speed   = 0f;      // 兜底（即使 disabled 时不会运行）
         }
 
         private void RestoreAnimatorState()
         {
-            if (animator != null)
-            {
-                animator.enabled = originalAnimatorEnabled;
-                animator.speed = originalAnimatorSpeed;
-            }
+            if (animator == null) return;
+            animator.enabled = originalAnimatorEnabled;
+            animator.speed   = originalAnimatorSpeed;
         }
+        // ============================================
 
-        public void SetPlayerTransform(Transform player)
-        {
-            playerTransform = player;
-        }
-
-        public void SetHeadTransform(Transform head)
-        {
-            headTransform = head;
-        }
-
-        public void SetAnimator(Animator targetAnimator)
-        {
-            animator = targetAnimator;
-        }
+        public void SetPlayerTransform(Transform player) => playerTransform = player;
+        public void SetHeadTransform(Transform head)     => headTransform = head;
+        public void SetAnimator(Animator targetAnimator) => animator = targetAnimator;
 
         public void SetBehavioursToDisable(List<Behaviour> behaviours)
         {
