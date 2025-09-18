@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+
+using UnityEngine.AI;
 using LSP.Gameplay.Navigation;
 
 namespace LSP.Gameplay
@@ -43,15 +45,25 @@ namespace LSP.Gameplay
         private float disablerFreezeDuration = 5f;
 
 
+        [Header("Vision Handling")]
+        [Tooltip("How long the monster stays frozen after briefly leaving the player's view.")]
+        [Min(0f)]
+        [SerializeField]
+        private float visionHoldDuration = 0.2f;
+
+        [Header("NavMesh (reserved)")]
+        [SerializeField]
+        private NavMeshAgent navMeshAgent;
+
         private readonly List<Vector3> currentPath = new List<Vector3>();
 
         private Collider monsterCollider;
         private MonsterState currentState = MonsterState.Chasing;
         private Vector3 spawnPosition;
         private Coroutine disablerRoutine;
-
         private float repathTimer;
         private int currentPathIndex;
+        private float timeSinceLastSeen;
 
 
         public MonsterState CurrentState => currentState;
@@ -60,6 +72,15 @@ namespace LSP.Gameplay
         {
             monsterCollider = GetComponent<Collider>();
             spawnPosition = transform.position;
+
+
+            if (navMeshAgent == null)
+            {
+                navMeshAgent = GetComponent<NavMeshAgent>();
+            }
+
+            SyncNavMeshAgentSettings();
+            timeSinceLastSeen = visionHoldDuration;
         }
 
 
@@ -76,34 +97,53 @@ namespace LSP.Gameplay
 
         private void Update()
         {
-            UpdateStateFromVision();
-            UpdateMovement(Time.deltaTime);
+            float deltaTime = Time.deltaTime;
+            UpdateStateFromVision(deltaTime);
+            UpdateMovement(deltaTime);
         }
 
-        private void UpdateStateFromVision()
+        private void UpdateStateFromVision(float deltaTime)
+
         {
             if (playerVision == null || monsterCollider == null)
             {
                 return;
             }
 
-
             MonsterState previousState = currentState;
             bool inView = playerVision.CanSee(monsterCollider.bounds);
-            currentState = inView ? MonsterState.Stationary : MonsterState.Chasing;
+            timeSinceLastSeen = inView ? 0f : timeSinceLastSeen + deltaTime;
+
+            bool shouldHoldStationary = inView || timeSinceLastSeen < visionHoldDuration;
+            currentState = shouldHoldStationary ? MonsterState.Stationary : MonsterState.Chasing;
+
 
             if (currentState != previousState && currentState == MonsterState.Stationary)
             {
                 ClearPath();
-            }
-            
 
+                StopNavMeshAgent();
+            }
+            else if (currentState != previousState && currentState == MonsterState.Chasing)
+            {
+                ResumeNavMeshAgent();
+            }
         }
 
         private void UpdateMovement(float deltaTime)
         {
             if (currentState != MonsterState.Chasing || chaseTarget == null)
             {
+
+                StopNavMeshAgent();
+                return;
+            }
+
+            if (IsNavMeshAgentReady)
+            {
+                navMeshAgent.isStopped = false;
+                navMeshAgent.speed = chaseSpeed;
+                navMeshAgent.SetDestination(chaseTarget.position);
                 return;
             }
 
@@ -124,9 +164,6 @@ namespace LSP.Gameplay
                 MoveDirectly(deltaTime);
             }
 
-            Vector3 direction = (chaseTarget.position - transform.position).normalized;
-            transform.position += direction * chaseSpeed * deltaTime;
-
         }
 
         private void OnTriggerEnter(Collider other)
@@ -140,7 +177,13 @@ namespace LSP.Gameplay
             {
                 player = other.GetComponentInParent<PlayerStateController>();
             }
-            
+
+
+            if (player != null)
+            {
+                player.Kill();
+            }
+
         }
 
         /// <summary>
@@ -158,12 +201,28 @@ namespace LSP.Gameplay
 
         private IEnumerator DisablerRoutine()
         {
-            transform.position = spawnPosition;
+            bool warpedToSpawn = false;
+            if (IsNavMeshAgentAvailable && navMeshAgent.isOnNavMesh)
+            {
+                navMeshAgent.Warp(spawnPosition);
+                navMeshAgent.ResetPath();
+                navMeshAgent.isStopped = true;
+                warpedToSpawn = true;
+            }
+
+            if (!warpedToSpawn)
+            {
+                transform.position = spawnPosition;
+            }
+
+
             ClearPath();
             currentState = MonsterState.Stationary;
             yield return new WaitForSeconds(disablerFreezeDuration);
             disablerRoutine = null;
             currentState = MonsterState.Chasing;
+            ResumeNavMeshAgent();
+
         }
 
         /// <summary>
@@ -173,6 +232,16 @@ namespace LSP.Gameplay
         {
             chaseTarget = target;
             ClearPath();
+
+            if (currentState == MonsterState.Chasing)
+            {
+                ResumeNavMeshAgent();
+            }
+            else
+            {
+                StopNavMeshAgent();
+            }
+
         }
 
         public void SetPlayerVision(PlayerVision vision)
@@ -183,6 +252,14 @@ namespace LSP.Gameplay
         public void SetNavigationGraph(AStarNavigationGraph graph)
         {
             navigationGraph = graph;
+            ClearPath();
+        }
+
+        public void SetNavMeshAgent(NavMeshAgent agent)
+        {
+            navMeshAgent = agent;
+            SyncNavMeshAgentSettings();
+
         }
 
         private void RebuildPath()
@@ -257,6 +334,68 @@ namespace LSP.Gameplay
             currentPath.Clear();
             currentPathIndex = 0;
             repathTimer = 0f;
+
+
+            if (IsNavMeshAgentReady)
+            {
+                navMeshAgent.ResetPath();
+            }
         }
+
+        private void StopNavMeshAgent()
+        {
+            if (!IsNavMeshAgentAvailable)
+            {
+                return;
+            }
+
+            navMeshAgent.isStopped = true;
+
+            if (navMeshAgent.isOnNavMesh)
+            {
+                navMeshAgent.ResetPath();
+            }
+        }
+
+        private void ResumeNavMeshAgent()
+        {
+            if (!IsNavMeshAgentAvailable)
+            {
+                return;
+            }
+
+            if (navMeshAgent.isOnNavMesh)
+            {
+                navMeshAgent.isStopped = false;
+                navMeshAgent.speed = chaseSpeed;
+            }
+        }
+
+        private void SyncNavMeshAgentSettings()
+        {
+            if (!IsNavMeshAgentAvailable)
+            {
+                return;
+            }
+
+            navMeshAgent.speed = chaseSpeed;
+        }
+
+        private bool IsNavMeshAgentAvailable => navMeshAgent != null && navMeshAgent.enabled;
+
+        private bool IsNavMeshAgentReady => IsNavMeshAgentAvailable && navMeshAgent.isOnNavMesh;
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (navMeshAgent == null)
+            {
+                navMeshAgent = GetComponent<NavMeshAgent>();
+            }
+
+            SyncNavMeshAgentSettings();
+        }
+#endif
+
     }
 }

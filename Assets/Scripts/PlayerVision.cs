@@ -13,6 +13,11 @@ namespace LSP.Gameplay
         [SerializeField]
         private PlayerEyeControl eyeControl;
 
+        [Min(0f)]
+        [SerializeField]
+        private float maxDetectionDistance = 999f;
+
+
         private Plane[] cachedPlanes;
         private int cachedFrame = -1;
 
@@ -41,7 +46,21 @@ namespace LSP.Gameplay
             }
 
             CacheFrustumPlanes();
-            return GeometryUtility.TestPlanesAABB(cachedPlanes, bounds);
+            if (!GeometryUtility.TestPlanesAABB(cachedPlanes, bounds))
+            {
+                return false;
+            }
+
+            if (maxDetectionDistance <= 0f)
+            {
+                return true;
+            }
+
+            Vector3 viewerPosition = viewCamera.transform.position;
+            Vector3 closestPoint = bounds.ClosestPoint(viewerPosition);
+            float sqrDistance = (closestPoint - viewerPosition).sqrMagnitude;
+            float sqrRange = maxDetectionDistance * maxDetectionDistance;
+            return sqrDistance <= sqrRange;
         }
 
         private void CacheFrustumPlanes()
@@ -74,5 +93,16 @@ namespace LSP.Gameplay
         {
             eyeControl = control;
         }
+
+        /// <summary>
+        /// Allows runtime systems to override the maximum vision distance.
+        /// Setting the value to zero or below removes the distance limit.
+        /// </summary>
+        public void SetMaxDetectionDistance(float distance)
+        {
+            maxDetectionDistance = Mathf.Max(0f, distance);
+        }
+
+        public float MaxDetectionDistance => maxDetectionDistance;
     }
 }
