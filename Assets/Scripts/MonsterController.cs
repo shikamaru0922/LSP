@@ -36,6 +36,7 @@ namespace LSP.Gameplay
         [Header("NavMesh")]
         [SerializeField]
         private NavMeshAgent navMeshAgent;
+
         private Collider monsterCollider;
         private MonsterState currentState = MonsterState.Stationary;
         private Vector3 spawnPosition;
@@ -184,6 +185,7 @@ namespace LSP.Gameplay
             {
                 transform.position = spawnPosition;
             }
+
             StopNavMeshAgent();
             currentState = MonsterState.Stationary;
             yield return new WaitForSeconds(disablerFreezeDuration);
