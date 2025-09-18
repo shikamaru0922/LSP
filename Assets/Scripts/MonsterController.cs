@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using LSP.Gameplay.Navigation;
-using UnityEngine;
 
 namespace LSP.Gameplay
 {
@@ -97,9 +96,7 @@ namespace LSP.Gameplay
             {
                 ClearPath();
             }
-
-            bool inView = playerVision.CanSee(monsterCollider.bounds);
-            currentState = inView ? MonsterState.Stationary : MonsterState.Chasing;
+            
 
         }
 
@@ -143,12 +140,7 @@ namespace LSP.Gameplay
             {
                 player = other.GetComponentInParent<PlayerStateController>();
             }
-
-            if (player != null)
-            if (other.TryGetComponent<PlayerStateController>(out var player))
-            {
-                player.Kill();
-            }
+            
         }
 
         /// <summary>
