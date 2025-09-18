@@ -98,6 +98,10 @@ namespace LSP.Gameplay
             {
                 ResumeNavMeshAgent();
             }
+            
+            Debug.Log($"[MonsterVision] inView={playerVision?.CanSee(monsterCollider.bounds)} " +
+                      $"eyesOpen={(playerVision != null && playerVision.MaxDetectionDistance >= 0 ? (playerVision.GetComponent<PlayerEyeControl>()?.EyesOpen).ToString() : "N/A")} " +
+                      $"state={currentState} timeSinceLastSeen={timeSinceLastSeen:F2} cam={(playerVision ? playerVision.name : "null")}");
         }
 
         private void UpdateMovement(float deltaTime)
