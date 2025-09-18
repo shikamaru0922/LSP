@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
@@ -41,6 +42,8 @@ namespace LSP.Gameplay
         [SerializeField]
         private float fallbackMoveSpeed = 2.5f;
 
+        public static event Action<MonsterController> MonsterReset;
+
         private Collider monsterCollider;
         private MonsterState currentState = MonsterState.Stationary;
         private Vector3 spawnPosition;
@@ -62,7 +65,6 @@ namespace LSP.Gameplay
                 navMeshAgent = GetComponent<NavMeshAgent>();
             }
 
-            // 同步直线移动与 NavMesh 的速度
             if (navMeshAgent != null && navMeshAgent.speed > 0f)
             {
                 fallbackMoveSpeed = navMeshAgent.speed;
@@ -187,22 +189,7 @@ namespace LSP.Gameplay
 
         private IEnumerator DisablerRoutine()
         {
-            bool warpedToSpawn = false;
-            if (IsNavMeshAgentAvailable && navMeshAgent.isOnNavMesh)
-            {
-                navMeshAgent.Warp(spawnPosition);
-                navMeshAgent.ResetPath();
-                navMeshAgent.isStopped = true;
-                warpedToSpawn = true;
-            }
-
-            if (!warpedToSpawn)
-            {
-                transform.position = spawnPosition;
-            }
-
-            StopNavMeshAgent();
-            currentState = MonsterState.Stationary;
+            ResetToSpawn();
             yield return new WaitForSeconds(disablerFreezeDuration);
             disablerRoutine = null;
             currentState = isWorldAbnormal ? MonsterState.Chasing : MonsterState.Stationary;
@@ -232,6 +219,30 @@ namespace LSP.Gameplay
             {
                 StopNavMeshAgent();
             }
+        }
+
+        /// <summary>
+        /// Forces the monster back to its spawn location and broadcasts the reset event.
+        /// </summary>
+        public void ResetToSpawn()
+        {
+            bool warpedToSpawn = false;
+            if (IsNavMeshAgentAvailable && navMeshAgent.isOnNavMesh)
+            {
+                navMeshAgent.Warp(spawnPosition);
+                navMeshAgent.ResetPath();
+                navMeshAgent.isStopped = true;
+                warpedToSpawn = true;
+            }
+
+            if (!warpedToSpawn)
+            {
+                transform.position = spawnPosition;
+            }
+
+            StopNavMeshAgent();
+            currentState = MonsterState.Stationary;
+            RaiseMonsterReset();
         }
 
         public void SetPlayerVision(PlayerVision vision)
@@ -352,11 +363,17 @@ namespace LSP.Gameplay
             {
                 currentState = MonsterState.Stationary;
                 StopNavMeshAgent();
+                RaiseMonsterReset();
             }
             else if (currentState == MonsterState.Stationary)
             {
                 timeSinceLastSeen = visionHoldDuration;
             }
+        }
+
+        private void RaiseMonsterReset()
+        {
+            MonsterReset?.Invoke(this);
         }
 
 #if UNITY_EDITOR
