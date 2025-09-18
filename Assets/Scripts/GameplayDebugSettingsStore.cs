@@ -10,8 +10,11 @@ namespace LSP.Gameplay
         public float PlayerSpeed = 4f;
         public float MonsterSpeed = 2.5f;
         public float MasterVolume = 1f;
-        public float CameraFieldOfView = 60f;
-        public float CameraOrthographicSize = 5f;
+        public float EyeMaximumWetness = 5f;
+        public float EyeDryingRate = 1f;
+        public float EyeRecoveryRate = 2f;
+        public float EyeForcedOpenThreshold = 1.5f;
+        public float EyeForcedCloseDuration = 2.5f;
     }
 
     public static class GameplayDebugSettingsStore

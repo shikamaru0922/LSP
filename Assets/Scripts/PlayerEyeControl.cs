@@ -36,7 +36,62 @@ namespace LSP.Gameplay
         private bool isManuallyClosing;
 
         public float CurrentWetness => currentWetness;
-        public float MaximumWetness => maximumWetness;
+
+        public float MaximumWetness
+        {
+            get => maximumWetness;
+            set
+            {
+                maximumWetness = Mathf.Max(0.01f, value);
+                if (forcedOpenThreshold > maximumWetness)
+                {
+                    forcedOpenThreshold = maximumWetness;
+                }
+
+                currentWetness = Mathf.Clamp(currentWetness, 0f, maximumWetness);
+            }
+        }
+
+        public float DryingRate
+        {
+            get => dryingRate;
+            set => dryingRate = Mathf.Max(0f, value);
+        }
+
+        public float RecoveryRate
+        {
+            get => recoveryRate;
+            set => recoveryRate = Mathf.Max(0f, value);
+        }
+
+        public float ForcedOpenThreshold
+        {
+            get => forcedOpenThreshold;
+            set
+            {
+                forcedOpenThreshold = Mathf.Clamp(value, 0f, maximumWetness);
+
+                if (!eyesOpen && !IsForcedClosing && !isManuallyClosing && currentWetness >= forcedOpenThreshold)
+                {
+                    eyesOpen = true;
+                }
+            }
+        }
+
+        public float ForcedCloseDuration
+        {
+            get => forcedCloseDuration;
+            set
+            {
+                forcedCloseDuration = Mathf.Max(0f, value);
+
+                if (IsForcedClosing)
+                {
+                    forcedCloseTimer = Mathf.Min(forcedCloseTimer, forcedCloseDuration);
+                }
+            }
+        }
+
         public bool EyesOpen => eyesOpen;
         public bool IsForcedClosing => forcedCloseTimer > 0f;
 
