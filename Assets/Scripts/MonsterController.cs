@@ -53,6 +53,7 @@ namespace LSP.Gameplay
         private bool subscribedToWorldEvent;
         private float desiredMoveSpeed;
         private bool isMoveSpeedFrozen;
+        private bool navAgentDisabledByVision;
 
         public MonsterState CurrentState => currentState;
         public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
@@ -93,6 +94,12 @@ namespace LSP.Gameplay
             {
                 StopCoroutine(disablerRoutine);
                 disablerRoutine = null;
+            }
+
+            if (navAgentDisabledByVision && navMeshAgent != null)
+            {
+                navMeshAgent.enabled = true;
+                navAgentDisabledByVision = false;
             }
 
             StopNavMeshAgent();
@@ -267,7 +274,43 @@ namespace LSP.Gameplay
 
             if (navMeshAgent != null)
             {
+                if (!isMoveSpeedFrozen && !navMeshAgent.enabled)
+                {
+                    navMeshAgent.enabled = true;
+                }
+
                 ApplyMoveSpeed(isMoveSpeedFrozen ? 0f : desiredMoveSpeed);
+
+                if (isMoveSpeedFrozen)
+                {
+                    if (navMeshAgent.enabled)
+                    {
+                        if (navMeshAgent.isOnNavMesh)
+                        {
+                            navMeshAgent.ResetPath();
+                            navMeshAgent.nextPosition = transform.position;
+                        }
+
+                        navMeshAgent.velocity = Vector3.zero;
+                        navMeshAgent.isStopped = true;
+                        navMeshAgent.enabled = false;
+                    }
+
+                    navAgentDisabledByVision = true;
+                }
+                else
+                {
+                    navAgentDisabledByVision = false;
+
+                    if (navMeshAgent.isOnNavMesh)
+                    {
+                        navMeshAgent.nextPosition = transform.position;
+                    }
+                }
+            }
+            else
+            {
+                navAgentDisabledByVision = false;
             }
 
             if (currentState == MonsterState.Chasing)
@@ -337,7 +380,16 @@ namespace LSP.Gameplay
 
             if (IsNavMeshAgentAvailable)
             {
+                if (navMeshAgent.isOnNavMesh)
+                {
+                    navMeshAgent.ResetPath();
+                    navMeshAgent.nextPosition = transform.position;
+                }
+
                 navMeshAgent.velocity = Vector3.zero;
+                navMeshAgent.isStopped = true;
+                navMeshAgent.enabled = false;
+                navAgentDisabledByVision = true;
             }
         }
 
@@ -349,6 +401,31 @@ namespace LSP.Gameplay
             }
 
             isMoveSpeedFrozen = false;
+
+            if (navAgentDisabledByVision)
+            {
+                if (navMeshAgent != null)
+                {
+                    navMeshAgent.enabled = true;
+                    bool warpedToCurrentPosition = navMeshAgent.Warp(transform.position);
+
+                    if (navMeshAgent.isOnNavMesh)
+                    {
+                        navMeshAgent.ResetPath();
+                        navMeshAgent.nextPosition = transform.position;
+                    }
+                    else if (!warpedToCurrentPosition)
+                    {
+                        navMeshAgent.nextPosition = transform.position;
+                    }
+
+                    navMeshAgent.velocity = Vector3.zero;
+                    navMeshAgent.isStopped = true;
+                }
+
+                navAgentDisabledByVision = false;
+            }
+
             ApplyMoveSpeed(desiredMoveSpeed);
         }
 
