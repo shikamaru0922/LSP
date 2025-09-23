@@ -51,6 +51,9 @@ namespace LSP.Gameplay
         private float timeSinceLastSeen;
         private bool isWorldAbnormal;
         private bool subscribedToWorldEvent;
+        private float desiredMoveSpeed;
+        private bool isMoveSpeedFrozen;
+        private bool navAgentDisabledByVision;
 
         public MonsterState CurrentState => currentState;
         public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
@@ -75,6 +78,7 @@ namespace LSP.Gameplay
             }
 
             timeSinceLastSeen = visionHoldDuration;
+            desiredMoveSpeed = Mathf.Max(0f, fallbackMoveSpeed);
         }
 
         private void OnEnable()
@@ -90,6 +94,12 @@ namespace LSP.Gameplay
             {
                 StopCoroutine(disablerRoutine);
                 disablerRoutine = null;
+            }
+
+            if (navAgentDisabledByVision && navMeshAgent != null)
+            {
+                navMeshAgent.enabled = true;
+                navAgentDisabledByVision = false;
             }
 
             StopNavMeshAgent();
@@ -126,6 +136,14 @@ namespace LSP.Gameplay
             timeSinceLastSeen = inView ? 0f : timeSinceLastSeen + deltaTime;
 
             bool shouldHoldStationary = inView || timeSinceLastSeen < visionHoldDuration;
+            if (shouldHoldStationary)
+            {
+                FreezeMoveSpeed();
+            }
+            else
+            {
+                RestoreMoveSpeed();
+            }
             currentState = shouldHoldStationary ? MonsterState.Stationary : MonsterState.Chasing;
 
             if (currentState != previousState && currentState == MonsterState.Stationary)
@@ -256,7 +274,43 @@ namespace LSP.Gameplay
 
             if (navMeshAgent != null)
             {
-                navMeshAgent.speed = Mathf.Max(0f, fallbackMoveSpeed);
+                if (!isMoveSpeedFrozen && !navMeshAgent.enabled)
+                {
+                    navMeshAgent.enabled = true;
+                }
+
+                ApplyMoveSpeed(isMoveSpeedFrozen ? 0f : desiredMoveSpeed);
+
+                if (isMoveSpeedFrozen)
+                {
+                    if (navMeshAgent.enabled)
+                    {
+                        if (navMeshAgent.isOnNavMesh)
+                        {
+                            navMeshAgent.ResetPath();
+                            navMeshAgent.nextPosition = transform.position;
+                        }
+
+                        navMeshAgent.velocity = Vector3.zero;
+                        navMeshAgent.isStopped = true;
+                        navMeshAgent.enabled = false;
+                    }
+
+                    navAgentDisabledByVision = true;
+                }
+                else
+                {
+                    navAgentDisabledByVision = false;
+
+                    if (navMeshAgent.isOnNavMesh)
+                    {
+                        navMeshAgent.nextPosition = transform.position;
+                    }
+                }
+            }
+            else
+            {
+                navAgentDisabledByVision = false;
             }
 
             if (currentState == MonsterState.Chasing)
@@ -289,11 +343,11 @@ namespace LSP.Gameplay
         public void SetMoveSpeed(float speed)
         {
             float clampedSpeed = Mathf.Max(0f, speed);
-            fallbackMoveSpeed = clampedSpeed;
+            desiredMoveSpeed = clampedSpeed;
 
-            if (IsNavMeshAgentAvailable)
+            if (!isMoveSpeedFrozen)
             {
-                navMeshAgent.speed = clampedSpeed;
+                ApplyMoveSpeed(clampedSpeed);
             }
         }
 
@@ -311,6 +365,77 @@ namespace LSP.Gameplay
             {
                 navMeshAgent.ResetPath();
                 navMeshAgent.nextPosition = transform.position;
+            }
+        }
+
+        private void FreezeMoveSpeed()
+        {
+            if (isMoveSpeedFrozen)
+            {
+                return;
+            }
+
+            isMoveSpeedFrozen = true;
+            ApplyMoveSpeed(0f);
+
+            if (IsNavMeshAgentAvailable)
+            {
+                if (navMeshAgent.isOnNavMesh)
+                {
+                    navMeshAgent.ResetPath();
+                    navMeshAgent.nextPosition = transform.position;
+                }
+
+                navMeshAgent.velocity = Vector3.zero;
+                navMeshAgent.isStopped = true;
+                navMeshAgent.enabled = false;
+                navAgentDisabledByVision = true;
+            }
+        }
+
+        private void RestoreMoveSpeed()
+        {
+            if (!isMoveSpeedFrozen)
+            {
+                return;
+            }
+
+            isMoveSpeedFrozen = false;
+
+            if (navAgentDisabledByVision)
+            {
+                if (navMeshAgent != null)
+                {
+                    navMeshAgent.enabled = true;
+                    bool warpedToCurrentPosition = navMeshAgent.Warp(transform.position);
+
+                    if (navMeshAgent.isOnNavMesh)
+                    {
+                        navMeshAgent.ResetPath();
+                        navMeshAgent.nextPosition = transform.position;
+                    }
+                    else if (!warpedToCurrentPosition)
+                    {
+                        navMeshAgent.nextPosition = transform.position;
+                    }
+
+                    navMeshAgent.velocity = Vector3.zero;
+                    navMeshAgent.isStopped = true;
+                }
+
+                navAgentDisabledByVision = false;
+            }
+
+            ApplyMoveSpeed(desiredMoveSpeed);
+        }
+
+        private void ApplyMoveSpeed(float speed)
+        {
+            fallbackMoveSpeed = Mathf.Max(0f, speed);
+
+            if (IsNavMeshAgentAvailable)
+            {
+                navMeshAgent.speed = fallbackMoveSpeed;
             }
         }
 
