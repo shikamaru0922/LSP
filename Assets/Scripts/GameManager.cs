@@ -96,5 +96,11 @@ namespace LSP.Gameplay
                 instance = null;
             }
         }
+
+        private void Update()
+        {
+            var shouldBeAbnormal = Input.GetKey(KeyCode.O);
+            SetWorldAbnormalState(shouldBeAbnormal);
+        }
     }
 }
