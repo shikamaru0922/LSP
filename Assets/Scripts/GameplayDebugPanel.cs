@@ -313,8 +313,7 @@ namespace LSP.Gameplay
                 float newSize = DrawSlider("Orthographic Size", currentSize, orthographicSizeMin, orthographicSizeMax);
                 if (!Mathf.Approximately(newSize, currentSize))
                 {
-                    playerCamera.orthographicSize = newSize;
-                    persistedSettings.CameraOrthographicSize = newSize;
+
                 }
             }
             else
@@ -323,8 +322,7 @@ namespace LSP.Gameplay
                 float newFov = DrawSlider("Field of View", currentFov, perspectiveFovMin, perspectiveFovMax);
                 if (!Mathf.Approximately(newFov, currentFov))
                 {
-                    playerCamera.fieldOfView = newFov;
-                    persistedSettings.CameraFieldOfView = newFov;
+
                 }
             }
         }
@@ -604,14 +602,7 @@ namespace LSP.Gameplay
             // Camera
             if (playerCamera != null)
             {
-                if (playerCamera.orthographic)
-                {
-                    playerCamera.orthographicSize = Mathf.Clamp(persistedSettings.CameraOrthographicSize, orthographicSizeMin, orthographicSizeMax);
-                }
-                else
-                {
-                    playerCamera.fieldOfView = Mathf.Clamp(persistedSettings.CameraFieldOfView, perspectiveFovMin, perspectiveFovMax);
-                }
+               
             }
 
             cachedMasterVolume = Mathf.Clamp(persistedSettings.MasterVolume, masterVolumeMin, masterVolumeMax);
@@ -640,10 +631,7 @@ namespace LSP.Gameplay
 
             if (playerCamera != null)
             {
-                if (playerCamera.orthographic)
-                    persistedSettings.CameraOrthographicSize = playerCamera.orthographicSize;
-                else
-                    persistedSettings.CameraFieldOfView = playerCamera.fieldOfView;
+             
             }
         }
 

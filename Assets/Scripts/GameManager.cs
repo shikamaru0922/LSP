@@ -29,7 +29,6 @@ namespace LSP.Gameplay
                 {
                     instance = FindObjectOfType<GameManager>();
                 }
-
                 return instance;
             }
         }
@@ -65,6 +64,14 @@ namespace LSP.Gameplay
             SetWorldAbnormalState(true);
         }
 
+        /// <summary>
+        /// Toggle helper: flip current abnormal state.
+        /// </summary>
+        public void ToggleWorldAbnormal()
+        {
+            SetWorldAbnormalState(!isWorldAbnormal);
+        }
+
         private void SetWorldAbnormalState(bool value, bool forceNotify)
         {
             if (isWorldAbnormal == value && !forceNotify)
@@ -84,7 +91,6 @@ namespace LSP.Gameplay
             {
                 return;
             }
-
             SetWorldAbnormalState(worldAbnormal, false);
         }
 #endif
@@ -99,8 +105,11 @@ namespace LSP.Gameplay
 
         private void Update()
         {
-            var shouldBeAbnormal = Input.GetKey(KeyCode.O);
-            SetWorldAbnormalState(shouldBeAbnormal);
+            // 按一次 O 就切换一次状态
+            if (Input.GetKeyDown(KeyCode.O))
+            {
+                ToggleWorldAbnormal();
+            }
         }
     }
 }
