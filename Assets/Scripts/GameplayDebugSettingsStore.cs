@@ -6,7 +6,7 @@ namespace LSP.Gameplay
 {
     [Serializable]
     public class GameplayDebugSettingsData
-    {
+    {//Dev
         public float PlayerSpeed = 4f;
         public float MonsterSpeed = 2.5f;
         public float MasterVolume = 1f;
