@@ -77,6 +77,14 @@
   - 提供可视化调试（Gizmos）展示各类距离阈值，便于关卡内调校。
   - Inspector 暴露所有阈值、音量曲线及动画持续时间参数。
 
+### 3.4 合成台 Prefab 配置
+- **脚本绑定**：在合成台物体上挂载 `CraftingStation` 组件，并在 Inspector 中设置以下引用：
+  - `Crafting Ui`：指向场景或合成台子节点上的 `CraftingUI` 组件（包含 Slider + Canvas）。
+  - `Repaired Disabler Mount`：合成台上用于生成修复后瘫痪器的空物体。脚本将在此位置生成 Prefab 并设为其子节点，保证朝向一致。
+- **Prefab 引用**：在 `Repaired Disabler Prefab` 字段放入修复后瘫痪器的预制体实例。
+- **场景验证**：确保玩家角色的 `PlayerInteractionController` 已配置 `DisablerDevice` 引用，否则合成条件无法满足。
+- **UI 生命周期**：`CraftingStation` 会在开始合成时调用 `PlayerInteractionController.IsUiOpen = true`。确认 UI 隐藏动画结束时会回调 `Hide()`，避免玩家在 UI 仍显示时重新获得交互输入。
+
 ## 4. 数据与平衡建议
 - 初始建议数值：
   - `dryRate`：每秒 8 单位；`wetRate`：每秒 20 单位；`forcedDuration`：3 秒。
