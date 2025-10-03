@@ -33,6 +33,10 @@ namespace LSP.Gameplay.Interactions
         [SerializeField]
         private Vector3 carriedLocalScale = Vector3.one;
 
+        [SerializeField]
+        [Tooltip("Optional reference transform whose pose can be copied into the carried pose settings.")]
+        private Transform carryPoseReference;
+
         [Header("Lock Interaction")]
         [SerializeField]
         [Tooltip("Radius around the item to check for lock interaction trigger volumes while carried.")]
@@ -283,5 +287,36 @@ namespace LSP.Gameplay.Interactions
             activeLockZones.Clear();
             lockZoneBuffer.Clear();
         }
+
+
+#if UNITY_EDITOR
+        [ContextMenu("Copy Carry Pose From Reference")]
+        private void CopyCarryPoseFromReference()
+        {
+            if (carryPoseReference == null)
+            {
+                Debug.LogWarning($"{name}: Carry pose reference is not assigned.", this);
+                return;
+            }
+
+            carriedLocalPosition = carryPoseReference.localPosition;
+            carriedLocalEulerAngles = carryPoseReference.localEulerAngles;
+            carriedLocalScale = carryPoseReference.localScale;
+        }
+
+        [ContextMenu("Move Item To Carry Pose Reference")]
+        private void MoveItemToCarryPoseReference()
+        {
+            if (carryPoseReference == null)
+            {
+                Debug.LogWarning($"{name}: Carry pose reference is not assigned.", this);
+                return;
+            }
+
+            transform.SetPositionAndRotation(carryPoseReference.position, carryPoseReference.rotation);
+            transform.localScale = carryPoseReference.localScale;
+        }
+#endif
+
     }
 }
