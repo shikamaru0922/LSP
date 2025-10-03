@@ -8,6 +8,12 @@ namespace LSP.Gameplay
     /// </summary>
     public class PlayerEyeControl : MonoBehaviour
     {
+        public enum BlinkType
+        {
+            Manual,
+            Forced
+        }
+
         [Header("Wetness Settings")]
         [SerializeField]
         private float maximumWetness = 5f;
@@ -18,22 +24,28 @@ namespace LSP.Gameplay
         [SerializeField]
         private float recoveryRate = 2f;
 
-        [Tooltip("Minimum wetness required before the player can open their eyes after a forced blink.")]
+        [Tooltip("Wetness restored instantly whenever the player blinks manually.")]
         [SerializeField]
-        private float forcedOpenThreshold = 1.5f;
+        private float restoreWetnessPerManualBlink = 1.5f;
 
-        [Tooltip("Seconds the player must keep their eyes shut when wetness hits zero.")]
+        [Header("Blink Durations")]
+        [Tooltip("Seconds the screen remains closed during a forced blink.")]
         [SerializeField]
-        private float forcedCloseDuration = 2.5f;
+        private float forcedBlinkDuration = 2f;
+
+        [Tooltip("Seconds the screen remains closed during a manual blink.")]
+        [SerializeField]
+        private float manualBlinkDuration = 0.5f;
 
         [Header("Input")]
+        [Tooltip("Mouse button used to trigger a manual blink.")]
         [SerializeField]
-        private KeyCode manualCloseKey = KeyCode.Space;
+        private int manualBlinkMouseButton = 0;
 
         private float currentWetness;
-        private float forcedCloseTimer;
+        private float forcedBlinkTimer;
+        private float manualBlinkTimer;
         private bool eyesOpen = true;
-        private bool isManuallyClosing;
 
         public float CurrentWetness => currentWetness;
 
@@ -43,11 +55,6 @@ namespace LSP.Gameplay
             set
             {
                 maximumWetness = Mathf.Max(0.01f, value);
-                if (forcedOpenThreshold > maximumWetness)
-                {
-                    forcedOpenThreshold = maximumWetness;
-                }
-
                 currentWetness = Mathf.Clamp(currentWetness, 0f, maximumWetness);
             }
         }
@@ -64,115 +71,146 @@ namespace LSP.Gameplay
             set => recoveryRate = Mathf.Max(0f, value);
         }
 
-        public float ForcedOpenThreshold
+        public float RestoreWetnessPerManualBlink
         {
-            get => forcedOpenThreshold;
-            set
-            {
-                forcedOpenThreshold = Mathf.Clamp(value, 0f, maximumWetness);
-
-                if (!eyesOpen && !IsForcedClosing && !isManuallyClosing && currentWetness >= forcedOpenThreshold)
-                {
-                    eyesOpen = true;
-                }
-            }
+            get => restoreWetnessPerManualBlink;
+            set => restoreWetnessPerManualBlink = Mathf.Max(0f, value);
         }
 
-        public float ForcedCloseDuration
+        public float ForcedBlinkDuration
         {
-            get => forcedCloseDuration;
-            set
-            {
-                forcedCloseDuration = Mathf.Max(0f, value);
+            get => forcedBlinkDuration;
+            set => forcedBlinkDuration = Mathf.Max(0f, value);
+        }
 
-                if (IsForcedClosing)
-                {
-                    forcedCloseTimer = Mathf.Min(forcedCloseTimer, forcedCloseDuration);
-                }
-            }
+        public float ManualBlinkDuration
+        {
+            get => manualBlinkDuration;
+            set => manualBlinkDuration = Mathf.Max(0f, value);
         }
 
         public bool EyesOpen => eyesOpen;
-        public bool IsForcedClosing => forcedCloseTimer > 0f;
+        public bool IsForcedClosing => forcedBlinkTimer > 0f;
+        public bool IsManualBlinking => manualBlinkTimer > 0f;
+        public bool IsBlinking => IsForcedClosing || IsManualBlinking;
 
         public event Action EyesForcedClosed;
         public event Action EyesForcedOpened;
+        public event Action<BlinkType, float> BlinkStarted;
+        public event Action<BlinkType> BlinkEnded;
 
         private void Awake()
         {
-            currentWetness = maximumWetness;
+            currentWetness = Mathf.Clamp(currentWetness <= 0f ? maximumWetness : currentWetness, 0f, maximumWetness);
+            eyesOpen = true;
         }
 
         private void Update()
         {
+            float deltaTime = Time.deltaTime;
+            UpdateBlinkTimers(deltaTime);
             HandleInput();
-            UpdateWetness(Time.deltaTime);
+            UpdateWetness(deltaTime);
         }
 
         private void HandleInput()
         {
-            if (IsForcedClosing)
+            if (IsForcedClosing || IsManualBlinking)
             {
-                // Player has no control while forced closed.
-                isManuallyClosing = true;
-                eyesOpen = false;
                 return;
             }
 
-            isManuallyClosing = Input.GetKey(manualCloseKey);
-            eyesOpen = !isManuallyClosing;
+            if (Input.GetMouseButtonDown(manualBlinkMouseButton))
+            {
+                BeginManualBlink();
+            }
+        }
+
+        private void UpdateBlinkTimers(float deltaTime)
+        {
+            if (manualBlinkTimer > 0f)
+            {
+                manualBlinkTimer -= deltaTime;
+                if (manualBlinkTimer <= 0f)
+                {
+                    manualBlinkTimer = 0f;
+                    if (!IsForcedClosing)
+                    {
+                        EndManualBlink();
+                    }
+                }
+            }
+
+            if (forcedBlinkTimer > 0f)
+            {
+                forcedBlinkTimer -= deltaTime;
+                if (forcedBlinkTimer <= 0f)
+                {
+                    forcedBlinkTimer = 0f;
+                    EndForcedBlink();
+                }
+            }
         }
 
         private void UpdateWetness(float deltaTime)
         {
-            if (eyesOpen)
+            if (EyesOpen)
             {
                 currentWetness -= dryingRate * deltaTime;
                 if (currentWetness <= 0f)
                 {
                     currentWetness = 0f;
-                    BeginForcedClose();
+                    BeginForcedBlink();
                 }
             }
             else
             {
-                RecoverWetness(deltaTime);
+                currentWetness += recoveryRate * deltaTime;
             }
 
             currentWetness = Mathf.Clamp(currentWetness, 0f, maximumWetness);
         }
 
-        private void RecoverWetness(float deltaTime)
+        private void BeginManualBlink()
         {
-            currentWetness += recoveryRate * deltaTime;
-
-            if (IsForcedClosing)
-            {
-                forcedCloseTimer -= deltaTime;
-
-                if (forcedCloseTimer <= 0f && currentWetness >= forcedOpenThreshold)
-                {
-                    forcedCloseTimer = 0f;
-                    eyesOpen = true;
-                    EyesForcedOpened?.Invoke();
-                }
-            }
-            else if (!isManuallyClosing && currentWetness >= forcedOpenThreshold)
-            {
-                eyesOpen = true;
-            }
+            manualBlinkTimer = manualBlinkDuration;
+            eyesOpen = false;
+            currentWetness = Mathf.Clamp(currentWetness + restoreWetnessPerManualBlink, 0f, maximumWetness);
+            BlinkStarted?.Invoke(BlinkType.Manual, manualBlinkDuration);
         }
 
-        private void BeginForcedClose()
+        private void EndManualBlink()
+        {
+            eyesOpen = !IsForcedClosing;
+            BlinkEnded?.Invoke(BlinkType.Manual);
+        }
+
+        private void BeginForcedBlink()
         {
             if (IsForcedClosing)
             {
                 return;
             }
 
-            forcedCloseTimer = forcedCloseDuration;
+            forcedBlinkTimer = forcedBlinkDuration;
             eyesOpen = false;
             EyesForcedClosed?.Invoke();
+            BlinkStarted?.Invoke(BlinkType.Forced, forcedBlinkDuration);
+        }
+
+        private void EndForcedBlink()
+        {
+            if (!IsManualBlinking)
+            {
+                eyesOpen = true;
+                BlinkEnded?.Invoke(BlinkType.Forced);
+            }
+            else
+            {
+                eyesOpen = false;
+            }
+
+            EyesForcedOpened?.Invoke();
         }
 
         /// <summary>
@@ -181,8 +219,21 @@ namespace LSP.Gameplay
         public void ResetWetness()
         {
             currentWetness = maximumWetness;
-            forcedCloseTimer = 0f;
+            forcedBlinkTimer = 0f;
+            manualBlinkTimer = 0f;
             eyesOpen = true;
         }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            maximumWetness = Mathf.Max(0.01f, maximumWetness);
+            dryingRate = Mathf.Max(0f, dryingRate);
+            recoveryRate = Mathf.Max(0f, recoveryRate);
+            restoreWetnessPerManualBlink = Mathf.Max(0f, restoreWetnessPerManualBlink);
+            forcedBlinkDuration = Mathf.Max(0f, forcedBlinkDuration);
+            manualBlinkDuration = Mathf.Max(0f, manualBlinkDuration);
+        }
+#endif
     }
 }
