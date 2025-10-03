@@ -26,6 +26,11 @@ namespace LSP.Gameplay
         [Tooltip("Physics layers considered valid when searching for interactables.")]
         private LayerMask interactableLayers = ~0;
 
+        [Header("Carrying")]
+        [SerializeField]
+        [Tooltip("Optional transform that defines the position/rotation used when carrying interactable items.")]
+        private Transform carryAnchor;
+
         [Header("Dependencies")]
         [SerializeField]
         private PlayerEyeControl eyeControl;
@@ -49,7 +54,23 @@ namespace LSP.Gameplay
         /// <summary>
         /// Returns the transform used as the anchor for carried items.
         /// </summary>
-        public Transform CarryAnchor => interactionCamera != null ? interactionCamera.transform : transform;
+        public Transform CarryAnchor
+        {
+            get
+            {
+                if (carryAnchor != null)
+                {
+                    return carryAnchor;
+                }
+
+                if (interactionCamera != null)
+                {
+                    return interactionCamera.transform;
+                }
+
+                return transform;
+            }
+        }
 
         /// <summary>
         /// Provides the active disabler device so consumable items can update fragment counts.

@@ -288,7 +288,6 @@ namespace LSP.Gameplay.Interactions
             lockZoneBuffer.Clear();
         }
 
-
 #if UNITY_EDITOR
         [ContextMenu("Copy Carry Pose From Reference")]
         private void CopyCarryPoseFromReference()
@@ -317,6 +316,5 @@ namespace LSP.Gameplay.Interactions
             transform.localScale = carryPoseReference.localScale;
         }
 #endif
-
     }
 }
