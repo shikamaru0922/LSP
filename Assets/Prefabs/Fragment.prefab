@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 7739290217332891861}
   - component: {fileID: 1369175406694947299}
   - component: {fileID: 7434467246016598634}
-  - component: {fileID: 920896512483520965}
+  - component: {fileID: 757925484307067611}
   m_Layer: 7
   m_Name: Fragment
   m_TagString: LockInteraction
@@ -31,7 +31,7 @@ Transform:
   m_GameObject: {fileID: 1082256463084892722}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.11685, y: 1.4029183, z: 5.2270617}
+  m_LocalPosition: {x: 2.92, y: 1.4029183, z: 5.2270617}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -33989,7 +33989,7 @@ MonoBehaviour:
   m_PreserveMeshAssetOnDestroy: 0
   assetGuid: 
   m_Mesh: {fileID: 0}
-  m_VersionIndex: 1201
+  m_VersionIndex: 1210
   m_IsSelectable: 1
   m_SelectedFaces: 
   m_SelectedEdges: []
@@ -34095,7 +34095,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.33468723, y: 0.33498275, z: 0.30045128}
   m_Center: {x: 0.16734362, y: 0.16749144, z: -0.15022564}
---- !u!114 &920896512483520965
+--- !u!114 &757925484307067611
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -34104,7 +34104,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1082256463084892722}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3d99f1451c72dc14a8ca15044d50a113, type: 3}
+  m_Script: {fileID: 11500000, guid: 2c23fa48802f0a649a0e49c68c288d1d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   pickupMode: 1
@@ -34116,6 +34116,7 @@ MonoBehaviour:
   lockDetectionRadius: 0.5
   lockZoneLayers:
     serializedVersion: 2
-    m_Bits: 128
+    m_Bits: 4294967295
   lockZoneTag: LockInteraction
   autoInteractionColliders: []
+  manualLockHandle: {fileID: 0}

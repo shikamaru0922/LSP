@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 5135616357124297847}
   - component: {fileID: 8993954826922911626}
   - component: {fileID: 3886713083436477905}
-  - component: {fileID: 1234435156254664610}
+  - component: {fileID: 1095516992112508934}
   m_Layer: 0
   m_Name: DisablerDevice
   m_TagString: LockInteraction
@@ -30,7 +30,7 @@ Transform:
   m_GameObject: {fileID: 6252445761846379151}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.0494385, y: 2.0878816, z: 4.87881}
+  m_LocalPosition: {x: -4.0494385, y: -14.59, z: 4.87881}
   m_LocalScale: {x: 1, y: 0.2, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -125,8 +125,7 @@ MonoBehaviour:
   chargeDuration: 4
   effectRadius: 10
   effectOrigin: {fileID: 1067271135511095354}
-  collectedFragments: 0
---- !u!114 &1234435156254664610
+--- !u!114 &1095516992112508934
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -135,10 +134,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 6252445761846379151}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3d99f1451c72dc14a8ca15044d50a113, type: 3}
+  m_Script: {fileID: 11500000, guid: 2c23fa48802f0a649a0e49c68c288d1d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  pickupMode: 1
+  pickupMode: 0
   fragmentValue: 1
   carriedLocalPosition: {x: 0, y: 0, z: 0}
   carriedLocalEulerAngles: {x: 0, y: 0, z: 0}
@@ -147,6 +146,6 @@ MonoBehaviour:
   lockDetectionRadius: 0.5
   lockZoneLayers:
     serializedVersion: 2
-    m_Bits: 128
+    m_Bits: 4294967295
   lockZoneTag: LockInteraction
   autoInteractionColliders: []
