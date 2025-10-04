@@ -210,5 +210,6 @@ namespace LSP.Gameplay
             RefreshMovementState();
             RefreshInteractionState();
         }
+
     }
 }

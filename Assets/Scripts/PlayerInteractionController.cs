@@ -46,6 +46,7 @@ namespace LSP.Gameplay
         private IInteractable currentInteractable;
         private InteractableItem carriedItem;
         private bool uiOpen;
+        private int pendingDisablerFragments;
 
         /// <summary>
         /// Gets or sets a value indicating whether the player's interaction input is currently blocked by UI.
@@ -81,6 +82,11 @@ namespace LSP.Gameplay
         /// Provides the active disabler device so consumable items can update fragment counts.
         /// </summary>
         public DisablerDevice DisablerDevice => disablerDevice;
+
+        /// <summary>
+        /// The number of disabler fragments collected while no device was assigned.
+        /// </summary>
+        public int PendingDisablerFragments => pendingDisablerFragments;
 
         /// <summary>
         /// Gets the key used to activate the disabler device while interacting with it.
@@ -138,12 +144,47 @@ namespace LSP.Gameplay
         /// </summary>
         public void SetDisablerDevice(DisablerDevice device)
         {
-            if (device == null)
+            disablerDevice = device;
+
+            if (disablerDevice != null && pendingDisablerFragments > 0)
+            {
+                int before = disablerDevice.CollectedFragments;
+                int newCount = disablerDevice.AddRepairFragments(pendingDisablerFragments);
+                int consumed = Mathf.Clamp(newCount - before, 0, pendingDisablerFragments);
+                pendingDisablerFragments = Mathf.Max(0, pendingDisablerFragments - consumed);
+            }
+        }
+
+        /// <summary>
+        /// Stores disabler fragments collected while the player has no device.
+        /// </summary>
+        public void AddPendingDisablerFragments(int amount)
+        {
+            if (amount <= 0)
             {
                 return;
             }
 
-            disablerDevice = device;
+            pendingDisablerFragments = Mathf.Max(0, pendingDisablerFragments + amount);
+        }
+
+        /// <summary>
+        /// Attempts to spend pending fragments that were collected without a device.
+        /// </summary>
+        public bool TrySpendPendingDisablerFragments(int amount)
+        {
+            if (amount <= 0)
+            {
+                return true;
+            }
+
+            if (pendingDisablerFragments < amount)
+            {
+                return false;
+            }
+
+            pendingDisablerFragments -= amount;
+            return true;
         }
 
         /// <summary>
