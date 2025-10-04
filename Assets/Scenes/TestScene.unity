@@ -278,6 +278,11 @@ MonoBehaviour:
   returnDistanceThreshold: 0.5
   visionHoldDuration: 1
   navMeshAgent: {fileID: 64901447}
+  animator: {fileID: 0}
+  walkingStateName: walking
+  walkingTransitionDuration: 0.1
+  enableProximityRestart: 1
+  proximityRestartDistance: 1.5
   fallbackMoveSpeed: 2.5
 --- !u!195 &64901447
 NavMeshAgent:
@@ -5507,6 +5512,11 @@ MonoBehaviour:
   returnDistanceThreshold: 0.5
   visionHoldDuration: 0.2
   navMeshAgent: {fileID: 2037410333}
+  animator: {fileID: 0}
+  walkingStateName: walking
+  walkingTransitionDuration: 0.1
+  enableProximityRestart: 1
+  proximityRestartDistance: 1.5
   fallbackMoveSpeed: 2.5
 --- !u!65 &2037410335
 BoxCollider:
@@ -6608,6 +6618,11 @@ PrefabInstance:
       propertyPath: playerVision
       value: 
       objectReference: {fileID: 1710761703}
+    - target: {fileID: 5957888972940950672, guid: 679113e9b75adf841acbc1005d9a472e,
+        type: 3}
+      propertyPath: proximityRestartDistance
+      value: 0.3
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

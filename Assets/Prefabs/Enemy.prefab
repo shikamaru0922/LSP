@@ -63,6 +63,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: Enemy
       objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: 36078ab0369161e49a29d349ae3e0739,
+        type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: a84f9d5525e5abe4cbe28c22fcaf9796, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -122,9 +127,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chaseTarget: {fileID: 0}
   playerVision: {fileID: 0}
-  disablerFreezeDuration: 5
+  disablerFreezeDuration: 3
+  returnDistanceThreshold: 0.5
   visionHoldDuration: 0.2
   navMeshAgent: {fileID: 1201942249787299007}
+  animator: {fileID: 6140569920577645795}
+  walkingStateName: walking
+  walkingTransitionDuration: 0.1
+  enableProximityRestart: 1
+  proximityRestartDistance: 1.5
+  fallbackMoveSpeed: 2.5
 --- !u!136 &203697794002910233
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -148,3 +160,9 @@ CapsuleCollider:
   m_Height: 2.3497205
   m_Direction: 1
   m_Center: {x: 0, y: 0.67486024, z: 0}
+--- !u!95 &6140569920577645795 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 5866666021909216657, guid: 36078ab0369161e49a29d349ae3e0739,
+    type: 3}
+  m_PrefabInstance: {fileID: 314471762936598898}
+  m_PrefabAsset: {fileID: 0}
