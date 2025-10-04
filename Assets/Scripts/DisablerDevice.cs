@@ -5,20 +5,16 @@ namespace LSP.Gameplay
     public enum DisablerState
     {
         Broken,
-        Repaired,
-        Charged
+        Ready
     }
 
     /// <summary>
-    /// Controls the repair, charging and usage loops of the disabler item.
+    /// Controls the repair and usage loops of the disabler item.
     /// </summary>
     public class DisablerDevice : MonoBehaviour
     {
         [SerializeField]
         private int fragmentsRequired = 3;
-
-        [SerializeField]
-        private float chargeDuration = 4f;
 
         [SerializeField]
         private float effectRadius = 10f;
@@ -31,7 +27,6 @@ namespace LSP.Gameplay
         private Transform effectOrigin;
 
         private int collectedFragments;
-        private float chargeProgress;
 
         public DisablerState CurrentState { get; private set; } = DisablerState.Broken;
 
@@ -80,52 +75,17 @@ namespace LSP.Gameplay
             }
 
             collectedFragments = Mathf.Max(0, collectedFragments - fragmentsRequired);
-            if (useImmediatelyWhenRepaired)
-            {
-                chargeProgress = chargeDuration;
-                CurrentState = DisablerState.Charged;
-            }
-            else
-            {
-                chargeProgress = 0f;
-                CurrentState = DisablerState.Repaired;
-            }
+            CurrentState = DisablerState.Ready;
             return true;
         }
 
         /// <summary>
-        /// Progressively charges the device. Returns true once it is fully charged.
-        /// </summary>
-        public bool Charge(float deltaTime)
-        {
-            if (CurrentState == DisablerState.Charged)
-            {
-                return true;
-            }
-
-            if (CurrentState != DisablerState.Repaired)
-            {
-                return false;
-            }
-
-            chargeProgress += deltaTime;
-            if (chargeProgress >= chargeDuration)
-            {
-                chargeProgress = chargeDuration;
-                CurrentState = DisablerState.Charged;
-                return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>
         /// Uses the device, applying its effect to all monsters inside its radius.
-        /// The device returns to the repaired state afterwards, requiring another charge cycle.
+        /// The device returns to the broken state afterwards, requiring another repair cycle.
         /// </summary>
         public void Use()
         {
-            if (CurrentState != DisablerState.Charged)
+            if (CurrentState != DisablerState.Ready)
             {
                 return;
             }
@@ -139,8 +99,7 @@ namespace LSP.Gameplay
                 }
             }
 
-            CurrentState = DisablerState.Repaired;
-            chargeProgress = 0f;
+            CurrentState = DisablerState.Broken;
         }
 
         private void OnDrawGizmosSelected()
