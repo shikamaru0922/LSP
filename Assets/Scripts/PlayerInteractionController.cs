@@ -98,15 +98,6 @@ namespace LSP.Gameplay
                 }
             }
 
-            if (eyeControl == null)
-            {
-                eyeControl = GetComponent<PlayerEyeControl>();
-            }
-
-            if (eyeControl == null)
-            {
-                eyeControl = GetComponentInChildren<PlayerEyeControl>();
-            }
         }
 
         private void OnDisable()
