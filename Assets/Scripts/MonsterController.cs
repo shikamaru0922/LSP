@@ -44,6 +44,10 @@ namespace LSP.Gameplay
         [SerializeField]
         private NavMeshAgent navMeshAgent;
 
+        [Header("Animation")]
+        [SerializeField]
+        private Animator animator;
+
         [Tooltip("Fallback speed used when the monster is moved directly because the NavMeshAgent is unavailable.")]
         [SerializeField]
         private float fallbackMoveSpeed = 2.5f;
@@ -60,6 +64,9 @@ namespace LSP.Gameplay
         private float desiredMoveSpeed;
         private bool isMoveSpeedFrozen;
         private bool navAgentDisabledByVision;
+        private bool animatorFrozenByVision;
+        private float cachedAnimatorSpeed = 1f;
+        private bool cachedAnimatorEnabled = true;
 
         public MonsterState CurrentState => currentState;
         public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
@@ -74,6 +81,11 @@ namespace LSP.Gameplay
                 navMeshAgent = GetComponent<NavMeshAgent>();
             }
 
+            if (animator == null)
+            {
+                animator = GetComponentInChildren<Animator>();
+            }
+
             if (navMeshAgent != null && navMeshAgent.speed > 0f)
             {
                 fallbackMoveSpeed = navMeshAgent.speed;
@@ -85,6 +97,12 @@ namespace LSP.Gameplay
 
             timeSinceLastSeen = visionHoldDuration;
             desiredMoveSpeed = Mathf.Max(0f, fallbackMoveSpeed);
+
+            if (animator != null)
+            {
+                cachedAnimatorSpeed = animator.speed;
+                cachedAnimatorEnabled = animator.enabled;
+            }
         }
 
         private void OnEnable()
@@ -109,6 +127,7 @@ namespace LSP.Gameplay
             }
 
             StopNavMeshAgent();
+            RestoreAnimatorFromVision();
             UnsubscribeFromWorldEvent();
         }
 
@@ -150,10 +169,12 @@ namespace LSP.Gameplay
             if (shouldHoldStationary)
             {
                 FreezeMoveSpeed();
+                FreezeAnimatorByVision();
             }
             else
             {
                 RestoreMoveSpeed();
+                RestoreAnimatorFromVision();
             }
             currentState = shouldHoldStationary ? MonsterState.Stationary : MonsterState.Chasing;
 
@@ -270,6 +291,7 @@ namespace LSP.Gameplay
             }
 
             StopNavMeshAgent();
+            RestoreAnimatorFromVision();
             currentState = MonsterState.Returning;
             timeSinceLastSeen = 0f;
             RaiseMonsterReset();
@@ -286,6 +308,7 @@ namespace LSP.Gameplay
             currentState = MonsterState.Stationary;
             timeSinceLastSeen = visionHoldDuration;
             StopNavMeshAgent();
+            RestoreAnimatorFromVision();
         }
 
         private void SnapToSpawnPosition()
@@ -443,6 +466,32 @@ namespace LSP.Gameplay
                 navMeshAgent.enabled = false;
                 navAgentDisabledByVision = true;
             }
+        }
+
+        private void FreezeAnimatorByVision()
+        {
+            if (animator == null || animatorFrozenByVision)
+            {
+                return;
+            }
+
+            cachedAnimatorSpeed = animator.speed;
+            cachedAnimatorEnabled = animator.enabled;
+            animator.enabled = false;
+            animator.speed = 0f;
+            animatorFrozenByVision = true;
+        }
+
+        private void RestoreAnimatorFromVision()
+        {
+            if (animator == null || !animatorFrozenByVision)
+            {
+                return;
+            }
+
+            animator.enabled = cachedAnimatorEnabled;
+            animator.speed = cachedAnimatorSpeed;
+            animatorFrozenByVision = false;
         }
 
         private void RestoreMoveSpeed()
