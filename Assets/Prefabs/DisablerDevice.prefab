@@ -122,9 +122,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fragmentsRequired: 2
-  chargeDuration: 4
-  effectRadius: 10
+  effectRadius: 999
+  useImmediatelyWhenRepaired: 0
   effectOrigin: {fileID: 1067271135511095354}
+  startReady: 1
 --- !u!114 &1095516992112508934
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -139,6 +140,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   pickupMode: 0
   fragmentValue: 1
+  fragmentId: Default
   carriedLocalPosition: {x: 0, y: 0, z: 0}
   carriedLocalEulerAngles: {x: 0, y: 0, z: 0}
   carriedLocalScale: {x: 1, y: 1, z: 1}

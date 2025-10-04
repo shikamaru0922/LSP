@@ -91,6 +91,7 @@ namespace LSP.Gameplay
         /// </summary>
         public void Use()
         {
+            Debug.Log("11");
             if (CurrentState != DisablerState.Ready)
             {
                 return;
@@ -104,7 +105,7 @@ namespace LSP.Gameplay
                     monster.ApplyDisablerEffect();
                 }
             }
-
+            Debug.Log("22");
             CurrentState = DisablerState.Broken;
         }
 
