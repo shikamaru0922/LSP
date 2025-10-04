@@ -21,6 +21,12 @@ namespace LSP.Gameplay
         [SerializeField]
         private MonoBehaviour[] movementBehaviours;
 
+        [SerializeField]
+        private PlayerInteractionController interactionController;
+
+        [SerializeField]
+        private DisablerDevice disablerDevice;
+
         [Tooltip("Disable player movement whenever a forced blink is active.")]
         [SerializeField]
         private bool lockMovementDuringForcedBlink = true;
@@ -39,6 +45,22 @@ namespace LSP.Gameplay
             if (eyeControl == null)
             {
                 eyeControl = GetComponent<PlayerEyeControl>();
+            }
+
+            if (interactionController == null)
+            {
+                interactionController = GetComponent<PlayerInteractionController>();
+            }
+
+            if (disablerDevice == null)
+            {
+                disablerDevice = GetComponentInChildren<DisablerDevice>();
+            }
+
+            if (interactionController != null)
+            {
+                interactionController.SetEyeControl(eyeControl);
+                interactionController.SetDisablerDevice(disablerDevice);
             }
 
             if (movementBehaviours != null && movementBehaviours.Length > 0)
@@ -66,6 +88,7 @@ namespace LSP.Gameplay
             }
 
             RefreshMovementState();
+            RefreshInteractionState();
         }
 
         private void OnDisable()
@@ -80,11 +103,18 @@ namespace LSP.Gameplay
                 eyeControl.EyesForcedClosed -= HandleEyesForcedClosed;
                 eyeControl.EyesForcedOpened -= HandleEyesForcedOpened;
             }
+
+            if (interactionController != null)
+            {
+                interactionController.DropCarriedItem();
+                interactionController.enabled = false;
+            }
         }
 
         private void Update()
         {
             RefreshMovementState();
+            RefreshInteractionState();
         }
 
         private void RefreshMovementState()
@@ -97,6 +127,23 @@ namespace LSP.Gameplay
             }
 
             SetMovementEnabled(shouldMove);
+        }
+
+        private void RefreshInteractionState()
+        {
+            if (interactionController == null)
+            {
+                return;
+            }
+
+            interactionController.SetEyeControl(eyeControl);
+            interactionController.SetDisablerDevice(disablerDevice);
+
+            bool shouldEnable = stateController == null || stateController.IsAlive;
+            if (interactionController.enabled != shouldEnable)
+            {
+                interactionController.enabled = shouldEnable;
+            }
         }
 
         private void SetMovementEnabled(bool enabled)
@@ -141,6 +188,12 @@ namespace LSP.Gameplay
         private void HandlePlayerKilled()
         {
             SetMovementEnabled(false);
+
+            if (interactionController != null)
+            {
+                interactionController.DropCarriedItem();
+                interactionController.enabled = false;
+            }
         }
 
         private void HandleEyesForcedClosed()
@@ -148,12 +201,14 @@ namespace LSP.Gameplay
             if (lockMovementDuringForcedBlink)
             {
                 SetMovementEnabled(false);
+                RefreshInteractionState();
             }
         }
 
         private void HandleEyesForcedOpened()
         {
             RefreshMovementState();
+            RefreshInteractionState();
         }
     }
 }
