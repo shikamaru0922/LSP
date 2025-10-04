@@ -24,6 +24,10 @@ namespace LSP.Gameplay
         private float effectRadius = 10f;
 
         [SerializeField]
+        [Tooltip("If enabled, repairing immediately sets the disabler to Charged so it can be used without an extra charging step.")]
+        private bool useImmediatelyWhenRepaired = true;
+
+        [SerializeField]
         private Transform effectOrigin;
 
         private int collectedFragments;
@@ -76,7 +80,16 @@ namespace LSP.Gameplay
             }
 
             collectedFragments = Mathf.Max(0, collectedFragments - fragmentsRequired);
-            CurrentState = DisablerState.Repaired;
+            if (useImmediatelyWhenRepaired)
+            {
+                chargeProgress = chargeDuration;
+                CurrentState = DisablerState.Charged;
+            }
+            else
+            {
+                chargeProgress = 0f;
+                CurrentState = DisablerState.Repaired;
+            }
             return true;
         }
 
@@ -85,6 +98,11 @@ namespace LSP.Gameplay
         /// </summary>
         public bool Charge(float deltaTime)
         {
+            if (CurrentState == DisablerState.Charged)
+            {
+                return true;
+            }
+
             if (CurrentState != DisablerState.Repaired)
             {
                 return false;
