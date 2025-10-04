@@ -20,6 +20,10 @@ namespace LSP.Gameplay
         private float effectRadius = 10f;
 
         [SerializeField]
+        [Tooltip("If enabled, repairing immediately sets the disabler to Charged so it can be used without an extra charging step.")]
+        private bool useImmediatelyWhenRepaired = true;
+
+        [SerializeField]
         private Transform effectOrigin;
 
         private int collectedFragments;
