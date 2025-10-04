@@ -215,6 +215,10 @@ namespace LSP.Gameplay.Interactions
                 {
                     caller.DisablerDevice.AddRepairFragments(fragmentValue);
                 }
+                else
+                {
+                    caller.AddPendingDisablerFragments(fragmentValue);
+                }
             }
 
             Destroy(gameObject);

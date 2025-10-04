@@ -28,7 +28,11 @@ namespace LSP.Gameplay
 
         private int collectedFragments;
 
-        public DisablerState CurrentState { get; private set; } = DisablerState.Broken;
+        [SerializeField]
+        [Tooltip("Determines whether the disabler starts ready for use when it spawns.")]
+        private bool startReady = true;
+
+        public DisablerState CurrentState { get; private set; }
 
         public int FragmentsRequired => fragmentsRequired;
 
@@ -40,6 +44,8 @@ namespace LSP.Gameplay
             {
                 effectOrigin = transform;
             }
+
+            CurrentState = startReady ? DisablerState.Ready : DisablerState.Broken;
         }
 
         /// <summary>

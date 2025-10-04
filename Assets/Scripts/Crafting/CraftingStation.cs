@@ -32,6 +32,10 @@ namespace LSP.Gameplay.Crafting
         [Tooltip("Prefab instantiated when the disabler is repaired.")]
         private GameObject repairedDisablerPrefab;
 
+        [SerializeField]
+        [Tooltip("Fragments required to craft a disabler when no device has been assigned yet.")]
+        private int fallbackFragmentsRequired = 3;
+
         [Header("UI")]
         [SerializeField]
         private CraftingUI craftingUi;
@@ -41,6 +45,7 @@ namespace LSP.Gameplay.Crafting
         private float craftingProgress;
         private bool isCrafting;
         private bool hasCrafted;
+        private int cachedPrefabFragmentsRequired = -1;
 
         private Transform CraftingFocus => repairedDisablerMount != null ? repairedDisablerMount : transform;
 
@@ -83,7 +88,7 @@ namespace LSP.Gameplay.Crafting
                 return false;
             }
 
-            if (caller == null || caller.DisablerDevice == null)
+            if (caller == null)
             {
                 return false;
             }
@@ -93,14 +98,27 @@ namespace LSP.Gameplay.Crafting
                 return false;
             }
 
-            if (caller.DisablerDevice.CurrentState != DisablerState.Broken)
-            {
-                return false;
-            }
+            var device = caller.DisablerDevice;
 
-            if (caller.DisablerDevice.CollectedFragments < caller.DisablerDevice.FragmentsRequired)
+            if (device != null)
             {
-                return false;
+                if (device.CurrentState != DisablerState.Broken)
+                {
+                    return false;
+                }
+
+                if (device.CollectedFragments < device.FragmentsRequired)
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                int required = GetFragmentsRequired(caller);
+                if (caller.PendingDisablerFragments < required)
+                {
+                    return false;
+                }
             }
 
             return IsPlayerWithinRange(caller);
@@ -170,6 +188,11 @@ namespace LSP.Gameplay.Crafting
                 {
                     repaired = device.TryRepair();
                 }
+                else
+                {
+                    int required = GetFragmentsRequired(activePlayer);
+                    repaired = activePlayer.TrySpendPendingDisablerFragments(required);
+                }
             }
 
             hasCrafted = repaired;
@@ -200,6 +223,27 @@ namespace LSP.Gameplay.Crafting
 
             var mount = CraftingFocus;
             Instantiate(repairedDisablerPrefab, mount.position, mount.rotation, mount);
+        }
+
+        private int GetFragmentsRequired(PlayerInteractionController caller)
+        {
+            if (caller != null && caller.DisablerDevice != null)
+            {
+                return caller.DisablerDevice.FragmentsRequired;
+            }
+
+            if (cachedPrefabFragmentsRequired > 0)
+            {
+                return cachedPrefabFragmentsRequired;
+            }
+
+            if (repairedDisablerPrefab != null && repairedDisablerPrefab.TryGetComponent(out DisablerDevice prefabDevice))
+            {
+                cachedPrefabFragmentsRequired = prefabDevice.FragmentsRequired;
+                return cachedPrefabFragmentsRequired;
+            }
+
+            return Mathf.Max(1, fallbackFragmentsRequired);
         }
 
         private bool IsPlayerWithinRange(PlayerInteractionController caller)
