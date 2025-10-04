@@ -22,7 +22,25 @@ namespace LSP.Gameplay
         [SerializeField]
         private CanvasGroup eyelidOverlay;
 
+        [Header("Blink Fade Durations")]
+        [Tooltip("Seconds used to fade in the overlay for manual blinks.")]
+        [SerializeField]
+        private float manualFadeInDuration = 0.08f;
+
+        [Tooltip("Seconds used to fade out the overlay after a manual blink.")]
+        [SerializeField]
+        private float manualFadeOutDuration = 0.12f;
+
+        [Tooltip("Seconds used to fade in the overlay for forced blinks.")]
+        [SerializeField]
+        private float forcedFadeInDuration = 0.15f;
+
+        [Tooltip("Seconds used to fade out the overlay after a forced blink.")]
+        [SerializeField]
+        private float forcedFadeOutDuration = 0.25f;
+
         private Camera attachedCamera;
+        private Coroutine blinkRoutine;
 
         private void Awake()
         {
@@ -60,43 +78,147 @@ namespace LSP.Gameplay
             {
                 eyeControl.EyesForcedClosed += HandleEyesForcedClosed;
                 eyeControl.EyesForcedOpened += HandleEyesForcedOpened;
+                eyeControl.BlinkStarted += HandleBlinkStarted;
+                eyeControl.BlinkEnded += HandleBlinkEnded;
             }
 
-            UpdateOverlay();
+            UpdateOverlayImmediate();
         }
 
         private void OnDisable()
         {
+            if (blinkRoutine != null)
+            {
+                StopCoroutine(blinkRoutine);
+                blinkRoutine = null;
+            }
+
             if (eyeControl != null)
             {
                 eyeControl.EyesForcedClosed -= HandleEyesForcedClosed;
                 eyeControl.EyesForcedOpened -= HandleEyesForcedOpened;
+                eyeControl.BlinkStarted -= HandleBlinkStarted;
+                eyeControl.BlinkEnded -= HandleBlinkEnded;
             }
         }
 
         private void LateUpdate()
         {
-            UpdateOverlay();
+            if (eyeControl == null)
+            {
+                return;
+            }
+
+            if (!eyeControl.IsBlinking)
+            {
+                UpdateOverlayImmediate();
+            }
         }
 
         private void HandleEyesForcedClosed()
         {
-            UpdateOverlay();
+            UpdateOverlayImmediate();
         }
 
         private void HandleEyesForcedOpened()
         {
-            UpdateOverlay();
+            UpdateOverlayImmediate();
         }
 
-        private void UpdateOverlay()
+        private void HandleBlinkStarted(PlayerEyeControl.BlinkType blinkType, float duration)
         {
             if (eyelidOverlay == null)
             {
                 return;
             }
 
-            bool eyesCurrentlyOpen = eyeControl == null || (eyeControl.EyesOpen && !eyeControl.IsForcedClosing);
+            if (blinkRoutine != null)
+            {
+                StopCoroutine(blinkRoutine);
+            }
+
+            blinkRoutine = StartCoroutine(BlinkRoutine(blinkType, Mathf.Max(0f, duration)));
+        }
+
+        private void HandleBlinkEnded(PlayerEyeControl.BlinkType blinkType)
+        {
+            if (eyeControl != null && eyeControl.IsBlinking)
+            {
+                return;
+            }
+
+            UpdateOverlayImmediate();
+        }
+
+        private System.Collections.IEnumerator BlinkRoutine(PlayerEyeControl.BlinkType blinkType, float duration)
+        {
+            float fadeIn = blinkType == PlayerEyeControl.BlinkType.Forced ? forcedFadeInDuration : manualFadeInDuration;
+            float fadeOut = blinkType == PlayerEyeControl.BlinkType.Forced ? forcedFadeOutDuration : manualFadeOutDuration;
+
+            fadeIn = Mathf.Max(0f, fadeIn);
+            fadeOut = Mathf.Max(0f, fadeOut);
+
+            float fadeSum = fadeIn + fadeOut;
+            if (fadeSum > duration && fadeSum > 0f)
+            {
+                float scale = duration / fadeSum;
+                fadeIn *= scale;
+                fadeOut *= scale;
+                fadeSum = fadeIn + fadeOut;
+            }
+
+            float holdDuration = Mathf.Max(0f, duration - fadeSum);
+
+            yield return FadeOverlay(1f, fadeIn);
+
+            if (holdDuration > 0f)
+            {
+                yield return new WaitForSeconds(holdDuration);
+            }
+
+            yield return FadeOverlay(0f, fadeOut);
+
+            blinkRoutine = null;
+            UpdateOverlayImmediate();
+        }
+
+        private System.Collections.IEnumerator FadeOverlay(float targetAlpha, float duration)
+        {
+            if (eyelidOverlay == null)
+            {
+                yield break;
+            }
+
+            float startAlpha = eyelidOverlay.alpha;
+            if (Mathf.Approximately(duration, 0f))
+            {
+                eyelidOverlay.alpha = targetAlpha;
+                eyelidOverlay.blocksRaycasts = targetAlpha > 0f;
+                yield break;
+            }
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                eyelidOverlay.alpha = Mathf.Lerp(startAlpha, targetAlpha, t);
+                eyelidOverlay.blocksRaycasts = eyelidOverlay.alpha > 0f;
+                yield return null;
+            }
+
+            eyelidOverlay.alpha = targetAlpha;
+            eyelidOverlay.blocksRaycasts = targetAlpha > 0f;
+        }
+
+        private void UpdateOverlayImmediate()
+        {
+            if (eyelidOverlay == null)
+            {
+                return;
+            }
+
+            bool eyesCurrentlyOpen = eyeControl == null || eyeControl.EyesOpen;
             eyelidOverlay.alpha = eyesCurrentlyOpen ? 0f : 1f;
             eyelidOverlay.blocksRaycasts = !eyesCurrentlyOpen;
         }
