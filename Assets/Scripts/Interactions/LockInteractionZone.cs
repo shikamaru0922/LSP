@@ -1,3 +1,4 @@
+using LSP.UI;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -19,6 +20,11 @@ namespace LSP.Gameplay.Interactions
         [Tooltip("Seconds the carried item must remain in the zone to complete the lock interaction.")]
         private float requiredHoldTime = 2f;
 
+        [Header("UI")]
+        [SerializeField]
+        [Tooltip("Canvas group driven progress display shown while the interaction is active.")]
+        private ProgressCanvasGroup progressCanvasGroup;
+
         [Header("Events")]
         [SerializeField]
         private ProgressEvent progressUpdated;
@@ -28,6 +34,16 @@ namespace LSP.Gameplay.Interactions
 
         private InteractableItem activeItem;
         private float currentProgress;
+
+        private void Awake()
+        {
+            if (progressCanvasGroup == null)
+            {
+                progressCanvasGroup = GetComponentInChildren<ProgressCanvasGroup>(true);
+            }
+
+            progressCanvasGroup?.HideImmediate();
+        }
 
         /// <summary>
         /// Begins tracking the supplied item within the lock zone.
@@ -46,6 +62,7 @@ namespace LSP.Gameplay.Interactions
 
             activeItem = item;
             currentProgress = Mathf.Clamp(currentProgress, 0f, requiredHoldTime);
+            progressCanvasGroup?.Show();
             NotifyProgress();
         }
 
@@ -86,27 +103,39 @@ namespace LSP.Gameplay.Interactions
 
             activeItem = null;
             currentProgress = 0f;
-            NotifyProgress();
+            NotifyProgress(0f);
+            progressCanvasGroup?.Hide();
         }
 
         private void CompleteInteraction()
         {
+            NotifyProgress(1f);
+            progressCanvasGroup?.Hide();
+
             onLockCompleted?.Invoke();
             activeItem?.NotifyLockInteractionComplete(this);
             activeItem = null;
             currentProgress = 0f;
-            NotifyProgress();
         }
 
-        private void NotifyProgress()
+        private void NotifyProgress(float? overrideValue = null)
         {
-            if (progressUpdated == null)
+            float target;
+            if (overrideValue.HasValue)
             {
-                return;
+                target = Mathf.Clamp01(overrideValue.Value);
+            }
+            else if (requiredHoldTime <= 0f)
+            {
+                target = 1f;
+            }
+            else
+            {
+                target = Mathf.Clamp01(currentProgress / Mathf.Max(requiredHoldTime, Mathf.Epsilon));
             }
 
-            float target = requiredHoldTime <= 0f ? 1f : Mathf.Clamp01(currentProgress / requiredHoldTime);
-            progressUpdated.Invoke(target);
+            progressCanvasGroup?.SetProgress(target);
+            progressUpdated?.Invoke(target);
         }
     }
 }
