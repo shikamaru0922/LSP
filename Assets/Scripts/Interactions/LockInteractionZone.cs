@@ -39,6 +39,7 @@ namespace LSP.Interactions
         private int failuresConsumed;
         private bool interactionActive;
         private bool isUnlocked;
+        private int lastManualProcessFrame = -1;
 
         public float Progress => currentProgress;
         public bool IsUnlocked => isUnlocked;
@@ -73,7 +74,17 @@ namespace LSP.Interactions
             isUnlocked = false;
             currentProgress = 0f;
             interactionActive = false;
-            activeHandles.Clear();
+            ClearHandles();
+            progressDisplay?.SetProgress(0f);
+            progressDisplay?.HideImmediate();
+            lastManualProcessFrame = -1;
+        }
+
+        private void OnDisable()
+        {
+            ClearHandles();
+            progressDisplay?.HideImmediate();
+            lastManualProcessFrame = -1;
         }
 
         private void OnTriggerEnter(Collider other)
@@ -84,19 +95,7 @@ namespace LSP.Interactions
             }
 
             LockInteractionHandle handle = other.GetComponentInParent<LockInteractionHandle>();
-            if (handle == null || activeHandles.Contains(handle))
-            {
-                return;
-            }
-
-            if (!handle.IsActive)
-            {
-                return;
-            }
-
-            activeHandles.Add(handle);
-            handle.Released += HandleReleased;
-            UpdateInteractionState(true);
+            BeginInteraction(handle);
         }
 
         private void OnTriggerExit(Collider other)
@@ -107,77 +106,22 @@ namespace LSP.Interactions
                 return;
             }
 
-            if (activeHandles.Remove(handle))
-            {
-                handle.Released -= HandleReleased;
-                UpdateInteractionState(activeHandles.Count > 0);
-            }
+            CancelInteraction(handle);
         }
 
         private void HandleReleased(LockInteractionHandle handle)
         {
-            handle.Released -= HandleReleased;
-            if (activeHandles.Remove(handle))
-            {
-                UpdateInteractionState(activeHandles.Count > 0);
-            }
+            CancelInteraction(handle);
         }
 
         private void Update()
         {
-            if (isUnlocked)
+            if (lastManualProcessFrame == Time.frameCount)
             {
-                progressDisplay?.SetProgress(1f);
-                progressDisplay?.Show();
                 return;
             }
 
-            RemoveInactiveHandles();
-
-            bool hasValidHandle = activeHandles.Count > 0;
-            if (cooldownTimer > 0f)
-            {
-                cooldownTimer -= Time.deltaTime;
-                if (cooldownTimer <= 0f)
-                {
-                    cooldownTimer = 0f;
-                }
-                else
-                {
-                    hasValidHandle = false;
-                }
-            }
-
-            UpdateInteractionState(hasValidHandle);
-
-            float previous = currentProgress;
-            if (hasValidHandle)
-            {
-                currentProgress = Mathf.Min(1f, currentProgress + fillRate * Time.deltaTime);
-                if (Mathf.Approximately(currentProgress, 1f))
-                {
-                    HandleProgressComplete();
-                }
-            }
-            else if (currentProgress > 0f)
-            {
-                currentProgress = Mathf.Max(0f, currentProgress - decayRate * Time.deltaTime);
-            }
-
-            if (!Mathf.Approximately(previous, currentProgress))
-            {
-                ProgressChanged?.Invoke(currentProgress);
-                progressDisplay?.SetProgress(currentProgress);
-            }
-
-            if (currentProgress > 0f || hasValidHandle)
-            {
-                progressDisplay?.Show();
-            }
-            else
-            {
-                progressDisplay?.Hide();
-            }
+            ProcessStep(Time.deltaTime);
         }
 
         private void HandleProgressComplete()
@@ -195,6 +139,65 @@ namespace LSP.Interactions
             isUnlocked = true;
             ZoneUnlocked?.Invoke();
             progressDisplay?.SetProgress(1f);
+        }
+
+        /// <summary>
+        /// Explicitly registers a handle as interacting with the zone. Useful when the
+        /// item logic manages overlap checks manually instead of relying on trigger events.
+        /// </summary>
+        /// <param name="handle">Handle that should be considered active.</param>
+        public bool BeginInteraction(LockInteractionHandle handle)
+        {
+            if (!RegisterHandle(handle))
+            {
+                return false;
+            }
+
+            progressDisplay?.Show();
+            progressDisplay?.SetProgress(currentProgress);
+            return true;
+        }
+
+        /// <summary>
+        /// Advances the interaction while a handle remains in range. This mirrors the
+        /// behaviour that normally occurs in <see cref="Update"/> when using trigger-driven
+        /// overlaps so that external callers can drive the progression each frame.
+        /// </summary>
+        /// <param name="handle">The active handle.</param>
+        /// <param name="deltaTime">Time slice to apply for this update.</param>
+        public void ProcessInteraction(LockInteractionHandle handle, float deltaTime = -1f)
+        {
+            bool hasHandle = RegisterHandle(handle);
+
+            lastManualProcessFrame = Time.frameCount;
+            float stepDelta = deltaTime < 0f ? Time.deltaTime : deltaTime;
+            ProcessStep(Mathf.Max(0f, stepDelta), hasHandle ? true : (bool?)null);
+        }
+
+        /// <summary>
+        /// Cancels the current interaction for the provided handle, mirroring what happens
+        /// when the collider exits the trigger volume.
+        /// </summary>
+        /// <param name="handle">Handle leaving the zone.</param>
+        public void CancelInteraction(LockInteractionHandle handle = null)
+        {
+            if (handle == null)
+            {
+                ClearHandles();
+                return;
+            }
+
+            handle.Released -= HandleReleased;
+
+            if (activeHandles.Remove(handle))
+            {
+                UpdateInteractionState(activeHandles.Count > 0);
+            }
+
+            if (activeHandles.Count == 0 && Mathf.Approximately(currentProgress, 0f))
+            {
+                progressDisplay?.Hide();
+            }
         }
 
         private void UpdateInteractionState(bool state)
@@ -217,15 +220,22 @@ namespace LSP.Interactions
             for (int i = activeHandles.Count - 1; i >= 0; i--)
             {
                 LockInteractionHandle handle = activeHandles[i];
-                if (handle == null || !handle.IsActive)
+                if (handle == null)
                 {
-                    if (handle != null)
-                    {
-                        handle.Released -= HandleReleased;
-                    }
-
                     activeHandles.RemoveAt(i);
+                    UpdateInteractionState(activeHandles.Count > 0);
+                    continue;
                 }
+
+                if (!handle.IsActive)
+                {
+                    CancelInteraction(handle);
+                }
+            }
+
+            if (activeHandles.Count == 0)
+            {
+                UpdateInteractionState(false);
             }
         }
 
@@ -236,7 +246,109 @@ namespace LSP.Interactions
                 return false;
             }
 
-            return (interactorLayers.value & (1 << collider.gameObject.layer)) != 0;
+            return IsLayerEligible(collider.gameObject.layer);
+        }
+
+        private bool IsLayerEligible(int layer)
+        {
+            return (interactorLayers.value & (1 << layer)) != 0;
+        }
+
+        private bool RegisterHandle(LockInteractionHandle handle)
+        {
+            if (handle == null || isUnlocked || !handle.IsActive)
+            {
+                return false;
+            }
+
+            if (!IsLayerEligible(handle.gameObject.layer))
+            {
+                return false;
+            }
+
+            if (!activeHandles.Contains(handle))
+            {
+                activeHandles.Add(handle);
+                handle.Released += HandleReleased;
+            }
+
+            UpdateInteractionState(true);
+            return true;
+        }
+
+        private void ClearHandles()
+        {
+            for (int i = activeHandles.Count - 1; i >= 0; i--)
+            {
+                LockInteractionHandle handle = activeHandles[i];
+                if (handle != null)
+                {
+                    handle.Released -= HandleReleased;
+                }
+
+                activeHandles.RemoveAt(i);
+            }
+
+            UpdateInteractionState(false);
+
+            if (Mathf.Approximately(currentProgress, 0f))
+            {
+                progressDisplay?.Hide();
+            }
+        }
+
+        private void ProcessStep(float deltaTime, bool? overrideHandleState = null)
+        {
+            if (isUnlocked)
+            {
+                progressDisplay?.SetProgress(1f);
+                progressDisplay?.Show();
+                return;
+            }
+
+            RemoveInactiveHandles();
+
+            bool hasValidHandle = overrideHandleState ?? (activeHandles.Count > 0);
+
+            if (cooldownTimer > 0f)
+            {
+                cooldownTimer = Mathf.Max(0f, cooldownTimer - deltaTime);
+                if (cooldownTimer > 0f)
+                {
+                    hasValidHandle = false;
+                }
+            }
+
+            UpdateInteractionState(hasValidHandle);
+
+            float previous = currentProgress;
+            if (hasValidHandle)
+            {
+                currentProgress = Mathf.Min(1f, currentProgress + Mathf.Max(0f, fillRate) * deltaTime);
+                if (Mathf.Approximately(currentProgress, 1f))
+                {
+                    HandleProgressComplete();
+                }
+            }
+            else if (currentProgress > 0f)
+            {
+                currentProgress = Mathf.Max(0f, currentProgress - Mathf.Max(0f, decayRate) * deltaTime);
+            }
+
+            if (!Mathf.Approximately(previous, currentProgress))
+            {
+                ProgressChanged?.Invoke(currentProgress);
+                progressDisplay?.SetProgress(currentProgress);
+            }
+
+            if (currentProgress > 0f || hasValidHandle)
+            {
+                progressDisplay?.Show();
+            }
+            else
+            {
+                progressDisplay?.Hide();
+            }
         }
     }
 }
