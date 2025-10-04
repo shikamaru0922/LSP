@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.SceneManagement;
 
 namespace LSP.Gameplay
 {
@@ -44,6 +45,29 @@ namespace LSP.Gameplay
         [SerializeField]
         private NavMeshAgent navMeshAgent;
 
+        [Header("Animation")]
+        [SerializeField]
+        private Animator animator;
+
+        [Tooltip("Name of the walking state used when the monster is moving.")]
+        [SerializeField]
+        private string walkingStateName = "walking";
+
+        [Tooltip("Cross-fade duration when transitioning into the walking state.")]
+        [Min(0f)]
+        [SerializeField]
+        private float walkingTransitionDuration = 0.1f;
+
+        [Header("Player Proximity Restart")]
+        [Tooltip("If enabled, the level restarts when the monster reaches the player.")]
+        [SerializeField]
+        private bool enableProximityRestart = true;
+
+        [Tooltip("Distance at which the proximity restart triggers when enabled.")]
+        [Min(0f)]
+        [SerializeField]
+        private float proximityRestartDistance = 1.5f;
+
         [Tooltip("Fallback speed used when the monster is moved directly because the NavMeshAgent is unavailable.")]
         [SerializeField]
         private float fallbackMoveSpeed = 2.5f;
@@ -60,6 +84,12 @@ namespace LSP.Gameplay
         private float desiredMoveSpeed;
         private bool isMoveSpeedFrozen;
         private bool navAgentDisabledByVision;
+        private bool animatorFrozenByVision;
+        private float cachedAnimatorSpeed = 1f;
+        private bool cachedAnimatorEnabled = true;
+        private int walkingStateHash;
+        private bool walkingStateAvailable;
+        private bool restartTriggered;
 
         public MonsterState CurrentState => currentState;
         public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
@@ -74,6 +104,11 @@ namespace LSP.Gameplay
                 navMeshAgent = GetComponent<NavMeshAgent>();
             }
 
+            if (animator == null)
+            {
+                animator = GetComponentInChildren<Animator>();
+            }
+
             if (navMeshAgent != null && navMeshAgent.speed > 0f)
             {
                 fallbackMoveSpeed = navMeshAgent.speed;
@@ -85,6 +120,13 @@ namespace LSP.Gameplay
 
             timeSinceLastSeen = visionHoldDuration;
             desiredMoveSpeed = Mathf.Max(0f, fallbackMoveSpeed);
+
+            if (animator != null)
+            {
+                cachedAnimatorSpeed = animator.speed;
+                cachedAnimatorEnabled = animator.enabled;
+                CacheAnimatorAnimationConfiguration();
+            }
         }
 
         private void OnEnable()
@@ -92,6 +134,9 @@ namespace LSP.Gameplay
             SubscribeToWorldEvent();
             bool initialState = GameManager.Instance != null && GameManager.Instance.IsWorldAbnormal;
             ApplyWorldAbnormalState(initialState);
+            CacheAnimatorAnimationConfiguration();
+            restartTriggered = false;
+            ApplyAnimatorMovementState();
         }
 
         private void OnDisable()
@@ -109,6 +154,7 @@ namespace LSP.Gameplay
             }
 
             StopNavMeshAgent();
+            RestoreAnimatorFromVision();
             UnsubscribeFromWorldEvent();
         }
 
@@ -122,12 +168,16 @@ namespace LSP.Gameplay
                     StopNavMeshAgent();
                 }
 
+                ApplyAnimatorMovementState();
+                CheckForProximityRestart();
                 return;
             }
 
             float deltaTime = Time.deltaTime;
             UpdateStateFromVision(deltaTime);
             UpdateMovement(deltaTime);
+            ApplyAnimatorMovementState();
+            CheckForProximityRestart();
         }
 
         private void UpdateStateFromVision(float deltaTime)
@@ -150,20 +200,24 @@ namespace LSP.Gameplay
             if (shouldHoldStationary)
             {
                 FreezeMoveSpeed();
+                FreezeAnimatorByVision();
             }
             else
             {
                 RestoreMoveSpeed();
+                RestoreAnimatorFromVision();
             }
             currentState = shouldHoldStationary ? MonsterState.Stationary : MonsterState.Chasing;
 
             if (currentState != previousState && currentState == MonsterState.Stationary)
             {
                 StopNavMeshAgent();
+                ApplyAnimatorMovementState();
             }
             else if (currentState != previousState && currentState == MonsterState.Chasing)
             {
                 ResumeNavMeshAgent();
+                ApplyAnimatorMovementState();
             }
         }
 
@@ -270,9 +324,11 @@ namespace LSP.Gameplay
             }
 
             StopNavMeshAgent();
+            RestoreAnimatorFromVision();
             currentState = MonsterState.Returning;
             timeSinceLastSeen = 0f;
             RaiseMonsterReset();
+            ApplyAnimatorMovementState();
         }
 
         private void CompleteReturnToSpawn()
@@ -286,6 +342,8 @@ namespace LSP.Gameplay
             currentState = MonsterState.Stationary;
             timeSinceLastSeen = visionHoldDuration;
             StopNavMeshAgent();
+            RestoreAnimatorFromVision();
+            ApplyAnimatorMovementState();
         }
 
         private void SnapToSpawnPosition()
@@ -445,6 +503,34 @@ namespace LSP.Gameplay
             }
         }
 
+        private void FreezeAnimatorByVision()
+        {
+            if (animator == null || animatorFrozenByVision)
+            {
+                return;
+            }
+
+            cachedAnimatorSpeed = animator.speed;
+            cachedAnimatorEnabled = animator.enabled;
+            EnsureWalkingState();
+            animator.enabled = false;
+            animator.speed = 0f;
+            animatorFrozenByVision = true;
+        }
+
+        private void RestoreAnimatorFromVision()
+        {
+            if (animator == null || !animatorFrozenByVision)
+            {
+                return;
+            }
+
+            animator.enabled = cachedAnimatorEnabled;
+            animator.speed = cachedAnimatorSpeed;
+            animatorFrozenByVision = false;
+            ApplyAnimatorMovementState();
+        }
+
         private void RestoreMoveSpeed()
         {
             if (!isMoveSpeedFrozen)
@@ -504,6 +590,111 @@ namespace LSP.Gameplay
                 navMeshAgent.isStopped = false;
                 navMeshAgent.velocity = Vector3.zero;
             }
+        }
+
+        private void ApplyAnimatorMovementState()
+        {
+            if (animator == null)
+            {
+                return;
+            }
+
+            bool shouldWalk = currentState == MonsterState.Chasing || currentState == MonsterState.Returning;
+
+            if (animatorFrozenByVision)
+            {
+                if (shouldWalk)
+                {
+                    EnsureWalkingState();
+                }
+
+                return;
+            }
+
+            if (shouldWalk)
+            {
+                EnsureWalkingState();
+            }
+        }
+
+        private void CacheAnimatorAnimationConfiguration()
+        {
+            walkingStateHash = !string.IsNullOrEmpty(walkingStateName) ? Animator.StringToHash(walkingStateName) : 0;
+            walkingStateAvailable = false;
+
+            if (animator == null)
+            {
+                return;
+            }
+
+            if (walkingStateHash != 0 && animator.runtimeAnimatorController != null)
+            {
+                walkingStateAvailable = animator.HasState(0, walkingStateHash);
+            }
+        }
+
+        private void EnsureWalkingState()
+        {
+            if (!walkingStateAvailable || animator == null)
+            {
+                return;
+            }
+
+            if (animator.IsInTransition(0))
+            {
+                return;
+            }
+
+            AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+            if (stateInfo.shortNameHash != walkingStateHash)
+            {
+                animator.CrossFadeInFixedTime(walkingStateHash, walkingTransitionDuration);
+            }
+        }
+
+        private void CheckForProximityRestart()
+        {
+            if (!enableProximityRestart || restartTriggered || chaseTarget == null)
+            {
+                return;
+            }
+
+            if (currentState != MonsterState.Chasing)
+            {
+                return;
+            }
+
+            float threshold = Mathf.Max(0f, proximityRestartDistance);
+            if (threshold <= 0f)
+            {
+                return;
+            }
+
+            Vector3 difference = chaseTarget.position - transform.position;
+            difference.y = 0f;
+            float distanceSqr = difference.sqrMagnitude;
+            if (distanceSqr <= threshold * threshold)
+            {
+                TriggerProximityRestart();
+            }
+        }
+
+        private void TriggerProximityRestart()
+        {
+            if (restartTriggered)
+            {
+                return;
+            }
+
+            restartTriggered = true;
+
+            Scene activeScene = SceneManager.GetActiveScene();
+            if (!activeScene.IsValid())
+            {
+                return;
+            }
+
+            SceneManager.LoadScene(activeScene.name);
         }
 
         private bool IsNavMeshAgentAvailable => navMeshAgent != null && navMeshAgent.enabled;
@@ -600,6 +791,8 @@ namespace LSP.Gameplay
             {
                 timeSinceLastSeen = visionHoldDuration;
             }
+
+            ApplyAnimatorMovementState();
         }
 
         private void RaiseMonsterReset()
@@ -616,6 +809,15 @@ namespace LSP.Gameplay
             }
 
             returnDistanceThreshold = Mathf.Max(0f, returnDistanceThreshold);
+            walkingTransitionDuration = Mathf.Max(0f, walkingTransitionDuration);
+            proximityRestartDistance = Mathf.Max(0f, proximityRestartDistance);
+
+            if (animator == null)
+            {
+                animator = GetComponentInChildren<Animator>();
+            }
+
+            CacheAnimatorAnimationConfiguration();
         }
 #endif
     }
