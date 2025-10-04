@@ -78,6 +78,11 @@ namespace LSP.Gameplay
         public DisablerDevice DisablerDevice => disablerDevice;
 
         /// <summary>
+        /// Exposes the key used to trigger interactions so other systems can detect holds.
+        /// </summary>
+        public KeyCode InteractKey => interactKey;
+
+        /// <summary>
         /// The interactable item currently being carried by the player, if any.
         /// </summary>
         public InteractableItem CarriedItem => carriedItem;
@@ -93,15 +98,6 @@ namespace LSP.Gameplay
                 }
             }
 
-            if (eyeControl == null)
-            {
-                eyeControl = GetComponent<PlayerEyeControl>();
-            }
-
-            if (eyeControl == null)
-            {
-                eyeControl = GetComponentInChildren<PlayerEyeControl>();
-            }
         }
 
         private void OnDisable()

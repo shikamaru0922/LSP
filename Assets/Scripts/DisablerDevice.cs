@@ -75,6 +75,7 @@ namespace LSP.Gameplay
                 return false;
             }
 
+            collectedFragments = Mathf.Max(0, collectedFragments - fragmentsRequired);
             CurrentState = DisablerState.Repaired;
             return true;
         }
