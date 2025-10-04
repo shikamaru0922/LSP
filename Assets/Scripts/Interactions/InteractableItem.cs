@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using LSP.Interactions;
 using UnityEngine;
 
 namespace LSP.Gameplay.Interactions
@@ -54,6 +55,10 @@ namespace LSP.Gameplay.Interactions
         [Tooltip("Colliders that should become active while the item is carried to support trigger-only interactions.")]
         private Collider[] autoInteractionColliders;
 
+        [SerializeField]
+        [Tooltip("Optional handle used when manually driving lock interactions via radius checks.")]
+        private LockInteractionHandle manualLockHandle;
+
         private readonly List<LockInteractionZone> activeLockZones = new List<LockInteractionZone>();
         private readonly HashSet<LockInteractionZone> lockZoneBuffer = new HashSet<LockInteractionZone>();
         private readonly Collider[] overlapResults = new Collider[8];
@@ -74,6 +79,7 @@ namespace LSP.Gameplay.Interactions
         {
             CacheOriginalTransform();
             ConfigureAutoInteractionColliders(false);
+            EnsureManualLockHandle(false);
         }
 
         private void OnDisable()
@@ -84,6 +90,7 @@ namespace LSP.Gameplay.Interactions
             }
 
             ClearLockZones();
+            EnsureManualLockHandle(false);
         }
 
         private void Update()
@@ -158,13 +165,14 @@ namespace LSP.Gameplay.Interactions
             currentCarrier = null;
             ConfigureAutoInteractionColliders(false);
             ClearLockZones();
+            EnsureManualLockHandle(false);
         }
 
         internal void NotifyLockInteractionComplete(LockInteractionZone zone)
         {
             if (activeLockZones.Contains(zone))
             {
-                zone.CancelInteraction(this);
+                zone.CancelInteraction(GetManualLockHandle());
                 activeLockZones.Remove(zone);
             }
         }
@@ -189,6 +197,7 @@ namespace LSP.Gameplay.Interactions
 
             isCarried = true;
             ConfigureAutoInteractionColliders(true);
+            EnsureManualLockHandle(true);
         }
 
         private void Consume(PlayerInteractionController caller)
@@ -212,6 +221,12 @@ namespace LSP.Gameplay.Interactions
         private void UpdateLockZoneTracking()
         {
             if (lockDetectionRadius <= 0f)
+            {
+                return;
+            }
+
+            LockInteractionHandle handle = GetManualLockHandle();
+            if (handle == null)
             {
                 return;
             }
@@ -241,10 +256,10 @@ namespace LSP.Gameplay.Interactions
                 if (!activeLockZones.Contains(zone))
                 {
                     activeLockZones.Add(zone);
-                    zone.BeginInteraction(this);
+                    zone.BeginInteraction(handle);
                 }
 
-                zone.ProcessInteraction(this, Time.deltaTime);
+                zone.ProcessInteraction(handle, Time.deltaTime);
             }
 
             for (int i = activeLockZones.Count - 1; i >= 0; i--)
@@ -252,7 +267,7 @@ namespace LSP.Gameplay.Interactions
                 var zone = activeLockZones[i];
                 if (!lockZoneBuffer.Contains(zone))
                 {
-                    zone.CancelInteraction(this);
+                    zone.CancelInteraction(handle);
                     activeLockZones.RemoveAt(i);
                 }
             }
@@ -278,14 +293,64 @@ namespace LSP.Gameplay.Interactions
 
         private void ClearLockZones()
         {
+            if (activeLockZones.Count == 0)
+            {
+                activeLockZones.Clear();
+                lockZoneBuffer.Clear();
+                return;
+            }
+
+            LockInteractionHandle handle = GetManualLockHandle();
             for (int i = activeLockZones.Count - 1; i >= 0; i--)
             {
                 var zone = activeLockZones[i];
-                zone?.CancelInteraction(this);
+                zone?.CancelInteraction(handle);
             }
 
             activeLockZones.Clear();
             lockZoneBuffer.Clear();
+        }
+
+        private void EnsureManualLockHandle(bool active)
+        {
+            if (!active && manualLockHandle == null)
+            {
+                return;
+            }
+
+            LockInteractionHandle handle = GetManualLockHandle();
+            if (handle == null)
+            {
+                return;
+            }
+
+            if (handle.enabled != active)
+            {
+                handle.enabled = active;
+            }
+        }
+
+        private LockInteractionHandle GetManualLockHandle()
+        {
+            if (manualLockHandle != null)
+            {
+                return manualLockHandle;
+            }
+
+            manualLockHandle = gameObject.GetComponent<LockInteractionHandle>();
+            bool created = false;
+            if (manualLockHandle == null)
+            {
+                manualLockHandle = gameObject.AddComponent<LockInteractionHandle>();
+                created = true;
+            }
+
+            if (created)
+            {
+                manualLockHandle.enabled = false;
+            }
+
+            return manualLockHandle;
         }
 
 #if UNITY_EDITOR
