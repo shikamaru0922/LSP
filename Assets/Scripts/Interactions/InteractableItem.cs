@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using LSP.Gameplay;
 using LSP.Interactions;
 using UnityEngine;
 
@@ -23,6 +24,10 @@ namespace LSP.Gameplay.Interactions
         [SerializeField]
         [Tooltip("Number of fragments granted to the disabler device when consumed.")]
         private int fragmentValue = 1;
+
+        [SerializeField]
+        [Tooltip("Identifier used when reporting fragment pickups to the GameManager.")]
+        private string fragmentId = "Default";
 
         [Header("Carry Anchor Pose")]
         [SerializeField]
@@ -65,6 +70,7 @@ namespace LSP.Gameplay.Interactions
         private Quaternion originalLocalRotation;
         private Vector3 originalLocalScale;
         private bool isCarried;
+        private DisablerDevice disablerDevice;
 
         /// <summary>
         /// Gets a value indicating whether the item is currently being carried by a player.
@@ -75,6 +81,7 @@ namespace LSP.Gameplay.Interactions
         {
             CacheOriginalTransform();
             ConfigureAutoInteractionColliders(false);
+            disablerDevice = GetComponent<DisablerDevice>();
         }
 
         private void OnDisable()
@@ -95,6 +102,7 @@ namespace LSP.Gameplay.Interactions
             }
 
             UpdateLockZoneTracking();
+            HandleCarriedInput();
         }
 
         /// <inheritdoc />
@@ -182,6 +190,11 @@ namespace LSP.Gameplay.Interactions
             currentCarrier = caller;
             currentCarrier.NotifyItemCarried(this);
 
+            if (disablerDevice != null)
+            {
+                currentCarrier.SetDisablerDevice(disablerDevice);
+            }
+
             var anchor = caller.CarryAnchor;
             transform.SetParent(anchor, false);
             transform.localPosition = carriedLocalPosition;
@@ -194,12 +207,32 @@ namespace LSP.Gameplay.Interactions
 
         private void Consume(PlayerInteractionController caller)
         {
-            if (fragmentValue > 0 && caller != null && caller.DisablerDevice != null)
+            if (fragmentValue > 0 && caller != null)
             {
-                caller.DisablerDevice.AddRepairFragments(fragmentValue);
+                GameManager.Instance?.RegisterDisablerFragmentPickup(fragmentId, fragmentValue);
+
+                if (caller.DisablerDevice != null)
+                {
+                    caller.DisablerDevice.AddRepairFragments(fragmentValue);
+                }
             }
 
             Destroy(gameObject);
+        }
+
+        private void HandleCarriedInput()
+        {
+            if (disablerDevice == null || currentCarrier == null)
+            {
+                return;
+            }
+
+            if (!Input.GetKeyDown(currentCarrier.DisablerUseKey))
+            {
+                return;
+            }
+
+            disablerDevice.Use();
         }
 
         private void CacheOriginalTransform()
