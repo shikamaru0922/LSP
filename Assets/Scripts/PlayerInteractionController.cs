@@ -38,6 +38,11 @@ namespace LSP.Gameplay
         [SerializeField]
         private DisablerDevice disablerDevice;
 
+        [Header("Disabler Usage")]
+        [SerializeField]
+        [Tooltip("Key used to trigger the disabler device while interacting with it.")]
+        private KeyCode disablerUseKey = KeyCode.Q;
+
         private IInteractable currentInteractable;
         private InteractableItem carriedItem;
         private bool uiOpen;
@@ -76,6 +81,11 @@ namespace LSP.Gameplay
         /// Provides the active disabler device so consumable items can update fragment counts.
         /// </summary>
         public DisablerDevice DisablerDevice => disablerDevice;
+
+        /// <summary>
+        /// Gets the key used to activate the disabler device while interacting with it.
+        /// </summary>
+        public KeyCode DisablerUseKey => disablerUseKey;
 
         /// <summary>
         /// Exposes the key used to trigger interactions so other systems can detect holds.

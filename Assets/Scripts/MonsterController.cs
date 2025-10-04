@@ -8,7 +8,8 @@ namespace LSP.Gameplay
     public enum MonsterState
     {
         Stationary,
-        Chasing
+        Chasing,
+        Returning
     }
 
     /// <summary>
@@ -27,6 +28,11 @@ namespace LSP.Gameplay
         [Tooltip("How long the monster stays frozen after being hit by the disabler.")]
         [SerializeField]
         private float disablerFreezeDuration = 5f;
+
+        [Tooltip("Distance threshold to consider the monster back at its spawn point when returning.")]
+        [Min(0f)]
+        [SerializeField]
+        private float returnDistanceThreshold = 0.5f;
 
         [Header("Vision Handling")]
         [Tooltip("How long the monster stays frozen after briefly leaving the player's view.")]
@@ -126,6 +132,11 @@ namespace LSP.Gameplay
 
         private void UpdateStateFromVision(float deltaTime)
         {
+            if (currentState == MonsterState.Returning)
+            {
+                return;
+            }
+
             if (playerVision == null || monsterCollider == null)
             {
                 return;
@@ -158,6 +169,12 @@ namespace LSP.Gameplay
 
         private void UpdateMovement(float deltaTime)
         {
+            if (currentState == MonsterState.Returning)
+            {
+                HandleReturnMovement(deltaTime);
+                return;
+            }
+
             if (currentState != MonsterState.Chasing || chaseTarget == null)
             {
                 StopNavMeshAgent();
@@ -200,25 +217,23 @@ namespace LSP.Gameplay
             if (disablerRoutine != null)
             {
                 StopCoroutine(disablerRoutine);
+                disablerRoutine = null;
             }
 
+            BeginReturnToSpawn();
             disablerRoutine = StartCoroutine(DisablerRoutine());
         }
 
         private IEnumerator DisablerRoutine()
         {
-            ResetToSpawn();
+            FreezeMoveSpeed();
             yield return new WaitForSeconds(disablerFreezeDuration);
             disablerRoutine = null;
-            currentState = isWorldAbnormal ? MonsterState.Chasing : MonsterState.Stationary;
+            RestoreMoveSpeed();
 
-            if (currentState == MonsterState.Chasing)
+            if (currentState == MonsterState.Returning)
             {
                 ResumeNavMeshAgent();
-            }
-            else
-            {
-                StopNavMeshAgent();
             }
         }
 
@@ -240,27 +255,54 @@ namespace LSP.Gameplay
         }
 
         /// <summary>
-        /// Forces the monster back to its spawn location and broadcasts the reset event.
+        /// Begins returning the monster to its spawn location and broadcasts the reset event.
         /// </summary>
         public void ResetToSpawn()
+        {
+            BeginReturnToSpawn();
+        }
+
+        private void BeginReturnToSpawn()
+        {
+            if (currentState == MonsterState.Returning)
+            {
+                return;
+            }
+
+            StopNavMeshAgent();
+            currentState = MonsterState.Returning;
+            timeSinceLastSeen = 0f;
+            RaiseMonsterReset();
+        }
+
+        private void CompleteReturnToSpawn()
+        {
+            if (currentState != MonsterState.Returning)
+            {
+                return;
+            }
+
+            SnapToSpawnPosition();
+            currentState = MonsterState.Stationary;
+            timeSinceLastSeen = visionHoldDuration;
+            StopNavMeshAgent();
+        }
+
+        private void SnapToSpawnPosition()
         {
             bool warpedToSpawn = false;
             if (IsNavMeshAgentAvailable && navMeshAgent.isOnNavMesh)
             {
-                navMeshAgent.Warp(spawnPosition);
+                warpedToSpawn = navMeshAgent.Warp(spawnPosition);
                 navMeshAgent.ResetPath();
+                navMeshAgent.velocity = Vector3.zero;
                 navMeshAgent.isStopped = true;
-                warpedToSpawn = true;
             }
 
             if (!warpedToSpawn)
             {
                 transform.position = spawnPosition;
             }
-
-            StopNavMeshAgent();
-            currentState = MonsterState.Stationary;
-            RaiseMonsterReset();
         }
 
         public void SetPlayerVision(PlayerVision vision)
@@ -325,7 +367,17 @@ namespace LSP.Gameplay
 
         private void MoveDirectly(float deltaTime)
         {
-            Vector3 direction = (chaseTarget.position - transform.position);
+            if (chaseTarget == null)
+            {
+                return;
+            }
+
+            MoveDirectlyTowards(chaseTarget.position, deltaTime);
+        }
+
+        private void MoveDirectlyTowards(Vector3 targetPosition, float deltaTime)
+        {
+            Vector3 direction = (targetPosition - transform.position);
             direction.y = 0f;
 
             if (direction.sqrMagnitude <= 0.0001f)
@@ -458,6 +510,59 @@ namespace LSP.Gameplay
 
         private bool IsNavMeshAgentReady => IsNavMeshAgentAvailable && navMeshAgent.isOnNavMesh;
 
+        private void HandleReturnMovement(float deltaTime)
+        {
+            if (isMoveSpeedFrozen)
+            {
+                StopNavMeshAgent();
+                return;
+            }
+
+            Vector3 targetPosition = spawnPosition;
+            float threshold = Mathf.Max(returnDistanceThreshold, 0.05f);
+            float thresholdSqr = threshold * threshold;
+
+            if (IsNavMeshAgentAvailable)
+            {
+                if (!navMeshAgent.isOnNavMesh)
+                {
+                    bool warpedToCurrentPosition = navMeshAgent.Warp(transform.position);
+
+                    if (!warpedToCurrentPosition)
+                    {
+                        MoveDirectlyTowards(targetPosition, deltaTime);
+
+                        if ((transform.position - targetPosition).sqrMagnitude <= thresholdSqr)
+                        {
+                            CompleteReturnToSpawn();
+                        }
+
+                        return;
+                    }
+                }
+
+                if (IsNavMeshAgentReady)
+                {
+                    navMeshAgent.isStopped = false;
+                    navMeshAgent.SetDestination(targetPosition);
+
+                    if (!navMeshAgent.pathPending && navMeshAgent.remainingDistance <= threshold)
+                    {
+                        CompleteReturnToSpawn();
+                    }
+
+                    return;
+                }
+            }
+
+            MoveDirectlyTowards(targetPosition, deltaTime);
+
+            if ((transform.position - targetPosition).sqrMagnitude <= thresholdSqr)
+            {
+                CompleteReturnToSpawn();
+            }
+        }
+
         private void SubscribeToWorldEvent()
         {
             if (subscribedToWorldEvent)
@@ -486,6 +591,7 @@ namespace LSP.Gameplay
 
             if (!isWorldAbnormal)
             {
+                CompleteReturnToSpawn();
                 currentState = MonsterState.Stationary;
                 StopNavMeshAgent();
                 RaiseMonsterReset();
@@ -508,6 +614,8 @@ namespace LSP.Gameplay
             {
                 navMeshAgent = GetComponent<NavMeshAgent>();
             }
+
+            returnDistanceThreshold = Mathf.Max(0f, returnDistanceThreshold);
         }
 #endif
     }
