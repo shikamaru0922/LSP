@@ -31,6 +31,10 @@ namespace LSP.Gameplay
 
         public DisablerState CurrentState { get; private set; } = DisablerState.Broken;
 
+        public int FragmentsRequired => fragmentsRequired;
+
+        public int CollectedFragments => collectedFragments;
+
         private void Awake()
         {
             if (effectOrigin == null)
@@ -44,7 +48,21 @@ namespace LSP.Gameplay
         /// </summary>
         public void AddRepairFragment()
         {
-            collectedFragments = Mathf.Min(collectedFragments + 1, fragmentsRequired);
+            AddRepairFragments(1);
+        }
+
+        /// <summary>
+        /// Adds multiple repair fragments to the device at once. Returns the updated fragment count.
+        /// </summary>
+        public int AddRepairFragments(int amount)
+        {
+            if (amount <= 0)
+            {
+                return collectedFragments;
+            }
+
+            collectedFragments = Mathf.Clamp(collectedFragments + amount, 0, fragmentsRequired);
+            return collectedFragments;
         }
 
         /// <summary>
@@ -57,6 +75,7 @@ namespace LSP.Gameplay
                 return false;
             }
 
+            collectedFragments = Mathf.Max(0, collectedFragments - fragmentsRequired);
             CurrentState = DisablerState.Repaired;
             return true;
         }
