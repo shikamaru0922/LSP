@@ -128,6 +128,11 @@ namespace LSP.Gameplay
         /// </summary>
         public void SetDisablerDevice(DisablerDevice device)
         {
+            if (device == null)
+            {
+                return;
+            }
+
             disablerDevice = device;
         }
 
@@ -136,6 +141,11 @@ namespace LSP.Gameplay
         /// </summary>
         public void SetEyeControl(PlayerEyeControl control)
         {
+            if (control == null)
+            {
+                return;
+            }
+
             eyeControl = control;
         }
 
