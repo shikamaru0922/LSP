@@ -26,6 +26,17 @@ namespace LSP.Gameplay
         [SerializeField]
         private PlayerVision playerVision;
 
+        [Header("Chase Constraints")]
+        [Tooltip("Distance from the spawn point at which the monster begins chasing the player. Set to 0 to disable.")]
+        [Min(0f)]
+        [SerializeField]
+        private float chaseActivationRadius = 10f;
+
+        [Tooltip("Maximum distance the monster can travel from its spawn point while chasing before disengaging. Set to 0 to disable.")]
+        [Min(0f)]
+        [SerializeField]
+        private float chaseLeashRadius = 15f;
+
         [Tooltip("How long the monster stays frozen after being hit by the disabler.")]
         [SerializeField]
         private float disablerFreezeDuration = 5f;
@@ -90,6 +101,7 @@ namespace LSP.Gameplay
         private int walkingStateHash;
         private bool walkingStateAvailable;
         private bool restartTriggered;
+        private bool returningIgnoresVision;
 
         public MonsterState CurrentState => currentState;
         public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
@@ -136,6 +148,7 @@ namespace LSP.Gameplay
             ApplyWorldAbnormalState(initialState);
             CacheAnimatorAnimationConfiguration();
             restartTriggered = false;
+            returningIgnoresVision = false;
             ApplyAnimatorMovementState();
         }
 
@@ -156,6 +169,7 @@ namespace LSP.Gameplay
             StopNavMeshAgent();
             RestoreAnimatorFromVision();
             UnsubscribeFromWorldEvent();
+            returningIgnoresVision = false;
         }
 
         private void Update()
@@ -182,42 +196,73 @@ namespace LSP.Gameplay
 
         private void UpdateStateFromVision(float deltaTime)
         {
-            if (currentState == MonsterState.Returning)
-            {
-                return;
-            }
-
             if (playerVision == null || monsterCollider == null)
             {
                 return;
             }
 
+            bool canChase = ShouldChaseTarget();
+
+            if (!canChase && currentState != MonsterState.Returning && !IsAtSpawn())
+            {
+                BeginReturnToSpawn();
+            }
+
             MonsterState previousState = currentState;
+
             bool inView = playerVision.CanSee(monsterCollider);
             timeSinceLastSeen = inView ? 0f : timeSinceLastSeen + deltaTime;
 
-            bool shouldHoldStationary = inView || timeSinceLastSeen < visionHoldDuration;
+            bool allowVisionControl = currentState != MonsterState.Returning || !returningIgnoresVision;
+            bool shouldHoldStationary = allowVisionControl && (inView || timeSinceLastSeen < visionHoldDuration);
+
             if (shouldHoldStationary)
             {
                 FreezeMoveSpeed();
                 FreezeAnimatorByVision();
+
+                if (allowVisionControl && currentState != MonsterState.Returning)
+                {
+                    currentState = MonsterState.Stationary;
+                }
             }
             else
             {
                 RestoreMoveSpeed();
                 RestoreAnimatorFromVision();
-            }
-            currentState = shouldHoldStationary ? MonsterState.Stationary : MonsterState.Chasing;
 
-            if (currentState != previousState && currentState == MonsterState.Stationary)
-            {
-                StopNavMeshAgent();
-                ApplyAnimatorMovementState();
+                if (currentState == MonsterState.Stationary)
+                {
+                    if (canChase)
+                    {
+                        currentState = MonsterState.Chasing;
+                    }
+                }
+                else if (currentState == MonsterState.Chasing && !canChase)
+                {
+                    if (!IsAtSpawn())
+                    {
+                        BeginReturnToSpawn();
+                    }
+                    else
+                    {
+                        currentState = MonsterState.Stationary;
+                    }
+                }
             }
-            else if (currentState != previousState && currentState == MonsterState.Chasing)
+
+            if (currentState != previousState)
             {
-                ResumeNavMeshAgent();
-                ApplyAnimatorMovementState();
+                if (currentState == MonsterState.Stationary)
+                {
+                    StopNavMeshAgent();
+                    ApplyAnimatorMovementState();
+                }
+                else if (currentState == MonsterState.Chasing)
+                {
+                    ResumeNavMeshAgent();
+                    ApplyAnimatorMovementState();
+                }
             }
         }
 
@@ -274,7 +319,7 @@ namespace LSP.Gameplay
                 disablerRoutine = null;
             }
 
-            BeginReturnToSpawn();
+            BeginReturnToSpawn(true);
             disablerRoutine = StartCoroutine(DisablerRoutine());
         }
 
@@ -313,18 +358,37 @@ namespace LSP.Gameplay
         /// </summary>
         public void ResetToSpawn()
         {
-            BeginReturnToSpawn();
+            ResetToSpawn(false);
         }
 
-        private void BeginReturnToSpawn()
+        public void ResetToSpawn(bool ignoreVisionFreeze)
+        {
+            BeginReturnToSpawn(ignoreVisionFreeze);
+        }
+
+        private void BeginReturnToSpawn(bool ignoreVisionFreeze = false)
         {
             if (currentState == MonsterState.Returning)
             {
+                if (ignoreVisionFreeze && !returningIgnoresVision)
+                {
+                    returningIgnoresVision = true;
+                    RestoreMoveSpeed();
+                    RestoreAnimatorFromVision();
+                }
+
                 return;
             }
 
+            returningIgnoresVision = ignoreVisionFreeze;
+
+            if (ignoreVisionFreeze)
+            {
+                RestoreMoveSpeed();
+                RestoreAnimatorFromVision();
+            }
+
             StopNavMeshAgent();
-            RestoreAnimatorFromVision();
             currentState = MonsterState.Returning;
             timeSinceLastSeen = 0f;
             RaiseMonsterReset();
@@ -341,6 +405,7 @@ namespace LSP.Gameplay
             SnapToSpawnPosition();
             currentState = MonsterState.Stationary;
             timeSinceLastSeen = visionHoldDuration;
+            returningIgnoresVision = false;
             StopNavMeshAgent();
             RestoreAnimatorFromVision();
             ApplyAnimatorMovementState();
@@ -752,6 +817,49 @@ namespace LSP.Gameplay
             {
                 CompleteReturnToSpawn();
             }
+        }
+
+        private bool ShouldChaseTarget()
+        {
+            if (chaseTarget == null)
+            {
+                return false;
+            }
+
+            if (chaseActivationRadius > 0f)
+            {
+                float activationRadiusSqr = chaseActivationRadius * chaseActivationRadius;
+                Vector3 targetOffset = chaseTarget.position - spawnPosition;
+                targetOffset.y = 0f;
+
+                if (targetOffset.sqrMagnitude > activationRadiusSqr)
+                {
+                    return false;
+                }
+            }
+
+            if (chaseLeashRadius > 0f)
+            {
+                float leashRadiusSqr = chaseLeashRadius * chaseLeashRadius;
+                Vector3 leashOffset = transform.position - spawnPosition;
+                leashOffset.y = 0f;
+
+                if (leashOffset.sqrMagnitude > leashRadiusSqr)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private bool IsAtSpawn()
+        {
+            float threshold = Mathf.Max(returnDistanceThreshold, 0.05f);
+            float thresholdSqr = threshold * threshold;
+            Vector3 offset = transform.position - spawnPosition;
+            offset.y = 0f;
+            return offset.sqrMagnitude <= thresholdSqr;
         }
 
         private void SubscribeToWorldEvent()
