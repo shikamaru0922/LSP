@@ -11,17 +11,17 @@ PrefabInstance:
     - target: {fileID: -8679921383154817045, guid: 36078ab0369161e49a29d349ae3e0739,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: -1.7519784
+      value: 31.05
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 36078ab0369161e49a29d349ae3e0739,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.5000001
+      value: -3.471
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 36078ab0369161e49a29d349ae3e0739,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: 4.789576
+      value: 13.144
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 36078ab0369161e49a29d349ae3e0739,
         type: 3}
@@ -135,7 +135,7 @@ MonoBehaviour:
   walkingStateName: walking
   walkingTransitionDuration: 0.1
   enableProximityRestart: 1
-  proximityRestartDistance: 1.5
+  proximityRestartDistance: 0.5
   fallbackMoveSpeed: 2.5
 --- !u!136 &203697794002910233
 CapsuleCollider:

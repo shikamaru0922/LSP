@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace LSP.Gameplay.UI
 {
@@ -22,7 +23,7 @@ namespace LSP.Gameplay.UI
 
         [SerializeField]
         [Tooltip("TextMeshPro component that renders the body of the note.")]
-        private TMP_Text noteBodyText;
+        private Text noteBodyText;
 
         [Header("Input")]
         [SerializeField]
