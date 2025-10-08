@@ -79,6 +79,10 @@ namespace LSP.Gameplay
         [SerializeField]
         private float proximityRestartDistance = 1.5f;
 
+        [Tooltip("Scene loaded after the player is caught. If empty the active scene reloads.")]
+        [SerializeField]
+        private string postEncounterSceneName;
+
         [Tooltip("Fallback speed used when the monster is moved directly because the NavMeshAgent is unavailable.")]
         [SerializeField]
         private float fallbackMoveSpeed = 2.5f;
@@ -759,7 +763,11 @@ namespace LSP.Gameplay
                 return;
             }
 
-            SceneManager.LoadScene(activeScene.name);
+            string sceneToLoad = !string.IsNullOrWhiteSpace(postEncounterSceneName)
+                ? postEncounterSceneName
+                : activeScene.name;
+
+            SceneManager.LoadScene(sceneToLoad);
         }
 
         private bool IsNavMeshAgentAvailable => navMeshAgent != null && navMeshAgent.enabled;
