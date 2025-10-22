@@ -4,15 +4,13 @@ using UnityEngine;
 namespace LSP.Gameplay
 {
     /// <summary>
-    /// Controls the player's breathing audio feedback based on the proximity of nearby monsters.
+    /// Controls the player's heartbeat audio feedback based on the proximity of nearby monsters.
     /// </summary>
     [DisallowMultipleComponent]
-    public class PlayerBreathingAudio : MonoBehaviour
+    public class PlayerHeartbeatAudio : MonoBehaviour
     {
-        private const float TenseStageIntensity = 0.5f;
-
         [Header("Audio")]
-        [Tooltip("Audio source that plays the breathing loop.")]
+        [Tooltip("Audio source that plays the heartbeat loop.")]
         [SerializeField]
         private AudioSource audioSource;
 
@@ -20,29 +18,28 @@ namespace LSP.Gameplay
         [SerializeField]
         private AnimationCurve volumeCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
 
-        [Tooltip("Seconds to fully fade in the breathing audio once active again.")]
+        [Tooltip("Curve mapping threat intensity (0-1) to playback pitch.")]
+        [SerializeField]
+        private AnimationCurve pitchCurve = AnimationCurve.Linear(0f, 1f, 1f, 1.5f);
+
+        [Tooltip("Seconds to fully fade in the heartbeat audio once active again.")]
         [SerializeField]
         private float fadeInDuration = 0.75f;
 
-        [Tooltip("Seconds to fade out the breathing audio when silenced.")]
+        [Tooltip("Seconds to fade out the heartbeat audio when silenced.")]
         [SerializeField]
         private float fadeOutDuration = 0.5f;
 
         [Header("Distance Thresholds (metres)")]
-        [Tooltip("Distance at which the breathing starts reacting to the monster.")]
+        [Tooltip("Distance at which the heartbeat starts reacting to the monster.")]
         [Min(0f)]
         [SerializeField]
-        private float alertDistance = 18f;
+        private float dangerDistance = 18f;
 
-        [Tooltip("Distance where the breathing reaches the tense stage.")]
+        [Tooltip("Distance where the heartbeat reaches maximum intensity.")]
         [Min(0f)]
         [SerializeField]
-        private float tenseDistance = 10f;
-
-        [Tooltip("Distance where the breathing reaches maximum panic.")]
-        [Min(0f)]
-        [SerializeField]
-        private float panicDistance = 4f;
+        private float criticalDistance = 3f;
 
         [Header("Dependencies")]
         [SerializeField]
@@ -98,7 +95,7 @@ namespace LSP.Gameplay
 
             isWorldAbnormal = GameManager.Instance == null || GameManager.Instance.IsWorldAbnormal;
 
-            currentFadeWeight = ShouldAllowBreathingAudio ? 1f : 0f;
+            currentFadeWeight = ShouldAllowHeartbeatAudio ? 1f : 0f;
             targetFadeWeight = currentFadeWeight;
 
             ApplyVolumeImmediately();
@@ -124,7 +121,7 @@ namespace LSP.Gameplay
         private void Update()
         {
             UpdateFadeWeight(Time.deltaTime);
-            UpdateVolume();
+            UpdateHeartbeatAudio();
         }
 
         /// <summary>
@@ -159,7 +156,7 @@ namespace LSP.Gameplay
             currentFadeWeight = Mathf.MoveTowards(currentFadeWeight, targetFadeWeight, step);
         }
 
-        private void UpdateVolume()
+        private void UpdateHeartbeatAudio()
         {
             if (audioSource == null)
             {
@@ -167,18 +164,19 @@ namespace LSP.Gameplay
             }
 
             float intensity = ComputeThreatIntensity();
-            float baseVolume = volumeCurve != null ? volumeCurve.Evaluate(intensity) : intensity;
-            float finalVolume = baseVolume * currentFadeWeight;
+            float volumeValue = volumeCurve != null ? volumeCurve.Evaluate(intensity) : intensity;
+            float pitchValue = pitchCurve != null ? pitchCurve.Evaluate(intensity) : Mathf.Lerp(1f, 1.5f, intensity);
 
-            ApplyVolume(finalVolume);
+            ApplyHeartbeatLevels(volumeValue * currentFadeWeight, pitchValue, currentFadeWeight);
         }
 
-        private void ApplyVolume(float volume)
+        private void ApplyHeartbeatLevels(float volume, float pitch, float weight)
         {
             volume = Mathf.Clamp01(volume);
             audioSource.volume = volume;
+            audioSource.pitch = Mathf.Max(0.01f, pitch);
 
-            if (volume > 0f)
+            if (weight > 0f && volume > 0f)
             {
                 if (!audioSource.isPlaying)
                 {
@@ -200,12 +198,13 @@ namespace LSP.Gameplay
 
             float intensity = ComputeThreatIntensity();
             float baseVolume = volumeCurve != null ? volumeCurve.Evaluate(intensity) : intensity;
-            ApplyVolume(baseVolume * currentFadeWeight);
+            float pitchValue = pitchCurve != null ? pitchCurve.Evaluate(intensity) : Mathf.Lerp(1f, 1.5f, intensity);
+            ApplyHeartbeatLevels(baseVolume * currentFadeWeight, pitchValue, currentFadeWeight);
         }
 
         private float ComputeThreatIntensity()
         {
-            if (!ShouldAllowBreathingAudio || !isWorldAbnormal)
+            if (!ShouldAllowHeartbeatAudio || !isWorldAbnormal)
             {
                 return 0f;
             }
@@ -239,37 +238,24 @@ namespace LSP.Gameplay
                 return 0f;
             }
 
-            if (closestDistance >= alertDistance)
+            if (closestDistance >= dangerDistance)
             {
                 return 0f;
             }
 
-            if (closestDistance <= panicDistance)
+            float maxIntensityDistance = Mathf.Max(0.01f, criticalDistance);
+            float startDistance = Mathf.Max(maxIntensityDistance, dangerDistance);
+
+            if (closestDistance <= maxIntensityDistance)
             {
                 return 1f;
             }
 
-            if (closestDistance <= tenseDistance)
-            {
-                if (Mathf.Approximately(tenseDistance, panicDistance))
-                {
-                    return TenseStageIntensity;
-                }
-
-                float t = Mathf.InverseLerp(panicDistance, tenseDistance, closestDistance);
-                return Mathf.Lerp(1f, TenseStageIntensity, t);
-            }
-
-            if (Mathf.Approximately(alertDistance, tenseDistance))
-            {
-                return TenseStageIntensity;
-            }
-
-            float tAlert = Mathf.InverseLerp(alertDistance, tenseDistance, closestDistance);
-            return Mathf.Lerp(0f, TenseStageIntensity, tAlert);
+            float t = Mathf.InverseLerp(startDistance, maxIntensityDistance, closestDistance);
+            return Mathf.Clamp01(t);
         }
 
-        private bool ShouldAllowBreathingAudio => isPlayerAlive && !isForcedClosed;
+        private bool ShouldAllowHeartbeatAudio => isPlayerAlive && !isForcedClosed;
 
         private void HandlePlayerKilled()
         {
@@ -320,9 +306,8 @@ namespace LSP.Gameplay
             fadeInDuration = Mathf.Max(0f, fadeInDuration);
             fadeOutDuration = Mathf.Max(0f, fadeOutDuration);
 
-            alertDistance = Mathf.Max(0f, alertDistance);
-            tenseDistance = Mathf.Clamp(tenseDistance, 0f, alertDistance);
-            panicDistance = Mathf.Clamp(panicDistance, 0f, tenseDistance);
+            dangerDistance = Mathf.Max(0f, dangerDistance);
+            criticalDistance = Mathf.Clamp(criticalDistance, 0f, dangerDistance);
         }
 #endif
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace LSP.Gameplay
@@ -15,11 +16,21 @@ namespace LSP.Gameplay
         /// </summary>
         public static event Action<bool> WorldAbnormalStateChanged;
 
+        /// <summary>
+        /// Raised when the recorded disabler fragment count for a given identifier changes.
+        /// </summary>
+        public static event Action<string, int> DisablerFragmentCountChanged;
+
         [SerializeField]
         [Tooltip("Controls whether the world abnormal event is active. Can be toggled at runtime for testing.")]
         private bool worldAbnormal;
 
         private bool isWorldAbnormal;
+        private readonly Dictionary<string, int> disablerFragments = new Dictionary<string, int>();
+
+        public IReadOnlyDictionary<string, int> DisablerFragments => disablerFragments;
+
+        public int TotalDisablerFragments { get; private set; }
 
         public static GameManager Instance
         {
@@ -46,6 +57,31 @@ namespace LSP.Gameplay
 
             instance = this;
             SetWorldAbnormalState(worldAbnormal, true);
+        }
+
+        /// <summary>
+        /// Records a disabler fragment pickup so UI systems can display totals.
+        /// </summary>
+        /// <param name="fragmentId">Identifier representing the fragment source/type.</param>
+        /// <param name="amount">Number of fragments acquired.</param>
+        public void RegisterDisablerFragmentPickup(string fragmentId, int amount)
+        {
+            if (string.IsNullOrEmpty(fragmentId) || amount <= 0)
+            {
+                return;
+            }
+
+            if (disablerFragments.TryGetValue(fragmentId, out int current))
+            {
+                disablerFragments[fragmentId] = current + amount;
+            }
+            else
+            {
+                disablerFragments[fragmentId] = amount;
+            }
+
+            TotalDisablerFragments += amount;
+            DisablerFragmentCountChanged?.Invoke(fragmentId, disablerFragments[fragmentId]);
         }
 
         /// <summary>

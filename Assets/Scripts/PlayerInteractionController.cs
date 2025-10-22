@@ -1,0 +1,301 @@
+using UnityEngine;
+using LSP.Gameplay.Interactions;
+
+namespace LSP.Gameplay
+{
+    /// <summary>
+    /// Handles player driven interactions by raycasting from the active camera and invoking
+    /// the focused <see cref="IInteractable"/> when prompted.
+    /// </summary>
+    [DisallowMultipleComponent]
+    public class PlayerInteractionController : MonoBehaviour
+    {
+        [Header("Interaction")]
+        [SerializeField]
+        private KeyCode interactKey = KeyCode.F;
+
+        [SerializeField]
+        [Tooltip("Camera used to perform interaction raycasts. Defaults to the main camera if left empty.")]
+        private Camera interactionCamera;
+
+        [SerializeField]
+        [Tooltip("Maximum distance from the camera that the player can interact with objects.")]
+        private float interactionDistance = 3f;
+
+        [SerializeField]
+        [Tooltip("Physics layers considered valid when searching for interactables.")]
+        private LayerMask interactableLayers = ~0;
+
+        [Header("Carrying")]
+        [SerializeField]
+        [Tooltip("Optional transform that defines the position/rotation used when carrying interactable items.")]
+        private Transform carryAnchor;
+
+        [Header("Dependencies")]
+        [SerializeField]
+        private PlayerEyeControl eyeControl;
+
+        [SerializeField]
+        private DisablerDevice disablerDevice;
+
+        [Header("Disabler Usage")]
+        [SerializeField]
+        [Tooltip("Key used to trigger the disabler device while interacting with it.")]
+        private KeyCode disablerUseKey = KeyCode.Q;
+
+        private IInteractable currentInteractable;
+        private InteractableItem carriedItem;
+        private bool uiOpen;
+        private int pendingDisablerFragments;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the player's interaction input is currently blocked by UI.
+        /// </summary>
+        public bool IsUiOpen
+        {
+            get => uiOpen;
+            set => uiOpen = value;
+        }
+
+        /// <summary>
+        /// Returns the transform used as the anchor for carried items.
+        /// </summary>
+        public Transform CarryAnchor
+        {
+            get
+            {
+                if (carryAnchor != null)
+                {
+                    return carryAnchor;
+                }
+
+                if (interactionCamera != null)
+                {
+                    return interactionCamera.transform;
+                }
+
+                return transform;
+            }
+        }
+
+        /// <summary>
+        /// Provides the active disabler device so consumable items can update fragment counts.
+        /// </summary>
+        public DisablerDevice DisablerDevice => disablerDevice;
+
+        /// <summary>
+        /// The number of disabler fragments collected while no device was assigned.
+        /// </summary>
+        public int PendingDisablerFragments => pendingDisablerFragments;
+
+        /// <summary>
+        /// Gets the key used to activate the disabler device while interacting with it.
+        /// </summary>
+        public KeyCode DisablerUseKey => disablerUseKey;
+
+        /// <summary>
+        /// Exposes the key used to trigger interactions so other systems can detect holds.
+        /// </summary>
+        public KeyCode InteractKey => interactKey;
+
+        /// <summary>
+        /// The interactable item currently being carried by the player, if any.
+        /// </summary>
+        public InteractableItem CarriedItem => carriedItem;
+
+        private void Awake()
+        {
+            if (interactionCamera == null)
+            {
+                interactionCamera = GetComponentInChildren<Camera>();
+                if (interactionCamera == null)
+                {
+                    interactionCamera = Camera.main;
+                }
+            }
+
+        }
+
+        private void OnDisable()
+        {
+            ClearFocus();
+            DropCarriedItem();
+        }
+
+        private void Update()
+        {
+            if (interactionCamera == null)
+            {
+                return;
+            }
+
+            if (IsInteractionSuspended())
+            {
+                ClearFocus();
+                return;
+            }
+
+            UpdateFocus();
+            HandleInteractionInput();
+        }
+
+        /// <summary>
+        /// Updates the reference to the disabler device that should receive fragment counts.
+        /// </summary>
+        public void SetDisablerDevice(DisablerDevice device)
+        {
+            disablerDevice = device;
+
+            if (disablerDevice != null && pendingDisablerFragments > 0)
+            {
+                int before = disablerDevice.CollectedFragments;
+                int newCount = disablerDevice.AddRepairFragments(pendingDisablerFragments);
+                int consumed = Mathf.Clamp(newCount - before, 0, pendingDisablerFragments);
+                pendingDisablerFragments = Mathf.Max(0, pendingDisablerFragments - consumed);
+            }
+        }
+
+        /// <summary>
+        /// Stores disabler fragments collected while the player has no device.
+        /// </summary>
+        public void AddPendingDisablerFragments(int amount)
+        {
+            if (amount <= 0)
+            {
+                return;
+            }
+
+            pendingDisablerFragments = Mathf.Max(0, pendingDisablerFragments + amount);
+        }
+
+        /// <summary>
+        /// Attempts to spend pending fragments that were collected without a device.
+        /// </summary>
+        public bool TrySpendPendingDisablerFragments(int amount)
+        {
+            if (amount <= 0)
+            {
+                return true;
+            }
+
+            if (pendingDisablerFragments < amount)
+            {
+                return false;
+            }
+
+            pendingDisablerFragments -= amount;
+            return true;
+        }
+
+        /// <summary>
+        /// Sets the eye control dependency used to determine when the player is blinking.
+        /// </summary>
+        public void SetEyeControl(PlayerEyeControl control)
+        {
+            if (control == null)
+            {
+                return;
+            }
+
+            eyeControl = control;
+        }
+
+        /// <summary>
+        /// Drops the currently carried item (if any) and restores its original transform hierarchy.
+        /// </summary>
+        public void DropCarriedItem()
+        {
+            if (carriedItem == null)
+            {
+                return;
+            }
+
+            var item = carriedItem;
+            carriedItem = null;
+            item.ReleaseFromCarrier();
+        }
+
+        internal void NotifyItemCarried(InteractableItem item)
+        {
+            if (carriedItem != null && carriedItem != item)
+            {
+                DropCarriedItem();
+            }
+
+            carriedItem = item;
+        }
+
+        internal void NotifyItemReleased(InteractableItem item)
+        {
+            if (carriedItem == item)
+            {
+                carriedItem = null;
+            }
+        }
+
+        private bool IsInteractionSuspended()
+        {
+            if (!isActiveAndEnabled)
+            {
+                return true;
+            }
+
+            if (uiOpen)
+            {
+                return true;
+            }
+
+            return eyeControl != null && eyeControl.IsBlinking;
+        }
+
+        private void HandleInteractionInput()
+        {
+            if (!Input.GetKeyDown(interactKey))
+            {
+                return;
+            }
+
+            if (carriedItem != null)
+            {
+                carriedItem.HandleInteractWhileCarried(this);
+                return;
+            }
+
+            if (currentInteractable == null)
+            {
+                return;
+            }
+
+            if (!currentInteractable.CanInteract(this))
+            {
+                return;
+            }
+
+            currentInteractable.Interact(this);
+        }
+
+        private void UpdateFocus()
+        {
+            var ray = interactionCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            if (!Physics.Raycast(ray, out var hit, interactionDistance, interactableLayers, QueryTriggerInteraction.Collide))
+            {
+                ClearFocus();
+                return;
+            }
+
+            var interactable = hit.collider.GetComponentInParent<IInteractable>();
+            if (interactable == null || !interactable.CanInteract(this))
+            {
+                ClearFocus();
+                return;
+            }
+
+            currentInteractable = interactable;
+        }
+
+        private void ClearFocus()
+        {
+            currentInteractable = null;
+        }
+    }
+}

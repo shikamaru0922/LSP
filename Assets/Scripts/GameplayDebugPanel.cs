@@ -254,7 +254,7 @@ namespace LSP.Gameplay
                 eyeForcedOpenThresholdMax,
                 Mathf.Max(eyeForcedOpenThresholdMin, eyeControl != null ? eyeControl.MaximumWetness : settings.EyeMaximumWetness)
             );
-            float currentForcedOpenThreshold = eyeControl != null ? eyeControl.ForcedOpenThreshold : settings.EyeForcedOpenThreshold;
+            /*float currentForcedOpenThreshold = eyeControl != null ? eyeControl.ForcedOpenThreshold : settings.EyeForcedOpenThreshold;
             currentForcedOpenThreshold = Mathf.Clamp(currentForcedOpenThreshold, eyeForcedOpenThresholdMin, forcedOpenMax);
             float newForcedOpenThreshold = DrawSlider("Forced Open Threshold", currentForcedOpenThreshold, eyeForcedOpenThresholdMin, forcedOpenMax);
             if (!Mathf.Approximately(newForcedOpenThreshold, currentForcedOpenThreshold))
@@ -269,7 +269,7 @@ namespace LSP.Gameplay
             {
                 if (eyeControl != null) eyeControl.ForcedCloseDuration = newForcedCloseDuration;
                 settings.EyeForcedCloseDuration = newForcedCloseDuration;
-            }
+            }*/
 
             if (playerVision != null)
             {
@@ -595,8 +595,8 @@ namespace LSP.Gameplay
                 eyeControl.MaximumWetness = clampedMaxWetness;
                 eyeControl.DryingRate = clampedDryingRate;
                 eyeControl.RecoveryRate = clampedRecoveryRate;
-                eyeControl.ForcedOpenThreshold = clampedForcedOpenThreshold;
-                eyeControl.ForcedCloseDuration = clampedForcedCloseDuration;
+                /*eyeControl.ForcedOpenThreshold = clampedForcedOpenThreshold;
+                eyeControl.ForcedCloseDuration = clampedForcedCloseDuration;*/
             }
 
             // Camera
@@ -625,8 +625,8 @@ namespace LSP.Gameplay
                 persistedSettings.EyeDryingRate = Mathf.Clamp(eyeControl.DryingRate, eyeDryingRateMin, eyeDryingRateMax);
                 persistedSettings.EyeRecoveryRate = Mathf.Clamp(eyeControl.RecoveryRate, eyeRecoveryRateMin, eyeRecoveryRateMax);
                 float forcedOpenUpperBound = Mathf.Min(eyeForcedOpenThresholdMax, Mathf.Max(eyeForcedOpenThresholdMin, persistedSettings.EyeMaximumWetness));
-                persistedSettings.EyeForcedOpenThreshold = Mathf.Clamp(eyeControl.ForcedOpenThreshold, eyeForcedOpenThresholdMin, forcedOpenUpperBound);
-                persistedSettings.EyeForcedCloseDuration = Mathf.Clamp(eyeControl.ForcedCloseDuration, eyeForcedCloseDurationMin, eyeForcedCloseDurationMax);
+                /*persistedSettings.EyeForcedOpenThreshold = Mathf.Clamp(eyeControl.ForcedOpenThreshold, eyeForcedOpenThresholdMin, forcedOpenUpperBound);
+                persistedSettings.EyeForcedCloseDuration = Mathf.Clamp(eyeControl.ForcedCloseDuration, eyeForcedCloseDurationMin, eyeForcedCloseDurationMax);*/
             }
 
             if (playerCamera != null)
