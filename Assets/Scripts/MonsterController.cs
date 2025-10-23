@@ -280,15 +280,15 @@ namespace LSP.Gameplay
             bool allowVisionControl = currentState != MonsterState.Returning || !returningIgnoresVision;
             bool shouldHoldStationary = allowVisionControl && (inView || timeSinceLastSeen < visionHoldDuration);
 
+            if (canChase && currentState == MonsterState.Stationary)
+            {
+                currentState = MonsterState.Chasing;
+            }
+
             if (shouldHoldStationary)
             {
                 FreezeMoveSpeed();
                 FreezeAnimatorByVision();
-
-                if (allowVisionControl && currentState != MonsterState.Returning)
-                {
-                    currentState = MonsterState.Stationary;
-                }
             }
             else
             {
