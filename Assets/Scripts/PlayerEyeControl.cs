@@ -49,11 +49,19 @@ namespace LSP.Gameplay
         [SerializeField]
         private float warningWetnessThresholdFraction = 0.25f;
 
-        [Tooltip("Seconds the warning blink keeps the eyes closed when wetness is low.")]
+        [Tooltip("How many quick flashes play while wetness is low.")]
         [SerializeField]
-        private float warningBlinkDuration = 1.8f;
+        private int warningBlinkFlashCount = 3;
 
-        [Tooltip("Delay between warning blinks while the wetness remains below the threshold.")]
+        [Tooltip("Seconds spent darkening the screen for each low wetness warning flash.")]
+        [SerializeField]
+        private float warningBlinkDarkenDuration = 0.08f;
+
+        [Tooltip("Seconds spent brightening the screen after each warning flash.")]
+        [SerializeField]
+        private float warningBlinkLightenDuration = 0.08f;
+
+        [Tooltip("Delay between warning blink sequences while the wetness remains below the threshold.")]
         [SerializeField]
         private float warningBlinkCooldown = 4f;
 
@@ -111,6 +119,24 @@ namespace LSP.Gameplay
         public bool IsManualBlinking => manualBlinkTimer > 0f;
         public bool IsWarningBlinking => warningBlinkTimer > 0f;
         public bool IsBlinking => IsForcedClosing || IsManualBlinking || IsWarningBlinking;
+
+        public int WarningBlinkFlashCount
+        {
+            get => Mathf.Max(1, warningBlinkFlashCount);
+            set => warningBlinkFlashCount = Mathf.Max(1, value);
+        }
+
+        public float WarningBlinkDarkenDuration
+        {
+            get => Mathf.Max(0f, warningBlinkDarkenDuration);
+            set => warningBlinkDarkenDuration = Mathf.Max(0f, value);
+        }
+
+        public float WarningBlinkLightenDuration
+        {
+            get => Mathf.Max(0f, warningBlinkLightenDuration);
+            set => warningBlinkLightenDuration = Mathf.Max(0f, value);
+        }
 
         public event Action EyesForcedClosed;
         public event Action EyesForcedOpened;
@@ -283,9 +309,8 @@ namespace LSP.Gameplay
 
         private void BeginWarningBlink()
         {
-            float duration = Mathf.Max(0f, warningBlinkDuration);
+            float duration = GetWarningBlinkDuration();
             warningBlinkTimer = duration;
-            eyesOpen = false;
             BlinkStarted?.Invoke(BlinkType.Warning, duration);
 
             if (warningBlinkTimer <= 0f)
@@ -298,11 +323,6 @@ namespace LSP.Gameplay
         {
             warningBlinkCooldownTimer = warningBlinkCooldown;
 
-            if (!IsForcedClosing && !IsManualBlinking)
-            {
-                eyesOpen = true;
-            }
-
             BlinkEnded?.Invoke(BlinkType.Warning);
         }
 
@@ -314,11 +334,6 @@ namespace LSP.Gameplay
             }
 
             warningBlinkTimer = 0f;
-
-            if (!IsForcedClosing && !IsManualBlinking)
-            {
-                eyesOpen = true;
-            }
 
             if (notify)
             {
@@ -340,6 +355,15 @@ namespace LSP.Gameplay
             eyesOpen = true;
         }
 
+        private float GetWarningBlinkDuration()
+        {
+            int flashes = Mathf.Max(1, warningBlinkFlashCount);
+            float darken = Mathf.Max(0f, warningBlinkDarkenDuration);
+            float lighten = Mathf.Max(0f, warningBlinkLightenDuration);
+
+            return flashes * (darken + lighten);
+        }
+
 #if UNITY_EDITOR
         private void OnValidate()
         {
@@ -350,7 +374,9 @@ namespace LSP.Gameplay
             forcedBlinkDuration = Mathf.Max(0f, forcedBlinkDuration);
             manualBlinkDuration = Mathf.Max(0f, manualBlinkDuration);
             warningWetnessThresholdFraction = Mathf.Clamp01(warningWetnessThresholdFraction);
-            warningBlinkDuration = Mathf.Max(0f, warningBlinkDuration);
+            warningBlinkFlashCount = Mathf.Max(1, warningBlinkFlashCount);
+            warningBlinkDarkenDuration = Mathf.Max(0f, warningBlinkDarkenDuration);
+            warningBlinkLightenDuration = Mathf.Max(0f, warningBlinkLightenDuration);
             warningBlinkCooldown = Mathf.Max(0f, warningBlinkCooldown);
         }
 #endif
