@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &811649161600962514
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2480847794428610216}
+  m_Layer: 0
+  m_Name: ItemPosition
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2480847794428610216
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 811649161600962514}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.27, z: 1.1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 936070455078374912}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2310833330918840777
 GameObject:
   m_ObjectHideFlags: 0
@@ -171,6 +202,13 @@ MonoBehaviour:
   playerVision: {fileID: 0}
   eyeControl: {fileID: 0}
   eyelidOverlay: {fileID: 0}
+  manualFadeInDuration: 0.08
+  manualFadeOutDuration: 0.12
+  forcedFadeInDuration: 0.15
+  forcedFadeOutDuration: 0.25
+  defaultWarningFlashCount: 3
+  defaultWarningDarkenDuration: 0.08
+  defaultWarningLightenDuration: 0.08
 --- !u!114 &8295824941862038216
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -183,12 +221,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b089f2d8ad84335b5e4ab5f11ef4f94, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maximumWetness: 999
-  dryingRate: 0
-  recoveryRate: 0
-  forcedOpenThreshold: 0
-  forcedCloseDuration: 0
-  manualCloseKey: 323
+  maximumWetness: 100
+  dryingRate: 5
+  recoveryRate: 10
+  restoreWetnessPerManualBlink: 5
+  forcedBlinkDuration: 3
+  manualBlinkDuration: 1
+  manualBlinkMouseButton: 0
+  warningWetnessThresholdFraction: 0.25
+  warningBlinkFlashCount: 3
+  warningBlinkDarkenDuration: 0.7
+  warningBlinkLightenDuration: 0.3
+  warningBlinkCooldown: 2
 --- !u!114 &3436980880825559502
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -206,7 +250,7 @@ MonoBehaviour:
   occlusionLayers:
     serializedVersion: 2
     m_Bits: 51
-  maxDetectionDistance: 20
+  maxDetectionDistance: 50
 --- !u!1001 &5362023165096411126
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -228,7 +272,7 @@ PrefabInstance:
     - target: {fileID: 8762286023885395322, guid: 9c489a8547f4d9e4387da15a4ff82c81,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.9449999
+      value: 1.9449997
       objectReference: {fileID: 0}
     - target: {fileID: 8762286023885395322, guid: 9c489a8547f4d9e4387da15a4ff82c81,
         type: 3}
@@ -306,15 +350,7 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8762286023885395077, guid: 9c489a8547f4d9e4387da15a4ff82c81,
         type: 3}
       insertIndex: -1
-      addedObject: {fileID: 7107045722320106873}
-    - targetCorrespondingSourceObject: {fileID: 8762286023885395077, guid: 9c489a8547f4d9e4387da15a4ff82c81,
-        type: 3}
-      insertIndex: -1
       addedObject: {fileID: 7108353158942812526}
-    - targetCorrespondingSourceObject: {fileID: 8762286023885395077, guid: 9c489a8547f4d9e4387da15a4ff82c81,
-        type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 4099715082468804093}
     - targetCorrespondingSourceObject: {fileID: 8762286023885395077, guid: 9c489a8547f4d9e4387da15a4ff82c81,
         type: 3}
       insertIndex: -1
@@ -365,7 +401,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 60
+  field of view: 64
   orthographic: 0
   orthographic size: 5
   m_Depth: 0
@@ -383,21 +419,6 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!114 &7107045722320106873
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3742595872848063347}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3ab8fdedc10445a0a0816fa056181d9c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  playerVision: {fileID: 0}
-  eyeControl: {fileID: 0}
-  eyelidOverlay: {fileID: 0}
 --- !u!114 &7108353158942812526
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -442,24 +463,6 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
---- !u!114 &4099715082468804093
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3742595872848063347}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5b089f2d8ad84335b5e4ab5f11ef4f94, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maximumWetness: 5
-  dryingRate: 1
-  recoveryRate: 2
-  forcedOpenThreshold: 1.5
-  forcedCloseDuration: 2.5
-  manualCloseKey: 32
 --- !u!114 &4555913937779085702
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -543,7 +546,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 8997996947095583982, guid: c5efc39a8aaf6e64ea40e9ad573e9b47,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2480847794428610216}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 8616685848737228372, guid: c5efc39a8aaf6e64ea40e9ad573e9b47,
         type: 3}
@@ -561,6 +568,14 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 5614790838425599606}
+    - targetCorrespondingSourceObject: {fileID: 8616685848737228372, guid: c5efc39a8aaf6e64ea40e9ad573e9b47,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6515083496400756657}
+    - targetCorrespondingSourceObject: {fileID: 8616685848737228372, guid: c5efc39a8aaf6e64ea40e9ad573e9b47,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3019537061233121803}
   m_SourcePrefab: {fileID: 100100000, guid: c5efc39a8aaf6e64ea40e9ad573e9b47, type: 3}
 --- !u!1 &555710434210944186 stripped
 GameObject:
@@ -583,6 +598,8 @@ MonoBehaviour:
   stateController: {fileID: 0}
   eyeControl: {fileID: 0}
   movementBehaviours: []
+  interactionController: {fileID: 0}
+  disablerDevice: {fileID: 0}
   lockMovementDuringForcedBlink: 1
 --- !u!114 &7633663099687983741
 MonoBehaviour:
@@ -634,11 +651,34 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  pitchCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0.5
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1.5
+      inSlope: 0.5
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   fadeInDuration: 0.75
   fadeOutDuration: 0.5
-  alertDistance: 18
-  tenseDistance: 10
-  panicDistance: 4
+  dangerDistance: 18
+  criticalDistance: 3
   stateController: {fileID: 0}
   eyeControl: {fileID: 8295824941862038216}
 --- !u!82 &5614790838425599606
@@ -651,7 +691,7 @@ AudioSource:
   m_Enabled: 1
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
-  m_audioClip: {fileID: 8300000, guid: 8d977283801bd8a4ead0b46417107eb7, type: 3}
+  m_audioClip: {fileID: 8300000, guid: 1c5ebdd5a0d42ed42bf6cbbbe7bd430f, type: 3}
   m_PlayOnAwake: 1
   m_Volume: 1
   m_Pitch: 1
@@ -737,6 +777,46 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &6515083496400756657
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 555710434210944186}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e9f8cb7df054786875fdcecb29ad1d4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  stateController: {fileID: 0}
+  eyeControl: {fileID: 8295824941862038216}
+  movementBehaviours: []
+  interactionController: {fileID: 3019537061233121803}
+  disablerDevice: {fileID: 0}
+  lockMovementDuringForcedBlink: 1
+--- !u!114 &3019537061233121803
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 555710434210944186}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 160b619818930284c8c728e69002e724, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  interactKey: 102
+  interactionCamera: {fileID: 0}
+  interactionDistance: 3
+  interactableLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  carryAnchor: {fileID: 2480847794428610216}
+  eyeControl: {fileID: 8295824941862038216}
+  disablerDevice: {fileID: 0}
+  disablerUseKey: 113
 --- !u!4 &936070455078374912 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8997996947095583982, guid: c5efc39a8aaf6e64ea40e9ad573e9b47,
