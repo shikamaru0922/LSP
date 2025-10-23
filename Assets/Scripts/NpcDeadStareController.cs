@@ -33,6 +33,31 @@ namespace LSP.Gameplay
         [SerializeField]
         private float headTurnSpeed = 360f;
 
+        [Header("Dead stare jitter")]
+        [Tooltip("Minimum and maximum time between head jitter bursts while staring.")]
+        [SerializeField]
+        private Vector2 jitterIntervalRange = new Vector2(0.1f, 0.35f);
+
+        [Tooltip("Maximum yaw offset (in degrees) applied during a jitter burst.")]
+        [Min(0f)]
+        [SerializeField]
+        private float jitterAngleDegrees = 12f;
+
+        [Tooltip("Degrees per second used when snapping toward the jitter offset.")]
+        [Min(0f)]
+        [SerializeField]
+        private float jitterSnapSpeed = 1440f;
+
+        [Tooltip("Degrees per second used when recovering from the jitter offset back to neutral.")]
+        [Min(0f)]
+        [SerializeField]
+        private float jitterRecoverySpeed = 540f;
+
+        [Tooltip("Probability of the jitter offset leaning to the NPC's right side.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float jitterRightBias = 0.65f;
+
         private NpcState currentState = NpcState.Normal;
         private readonly List<bool> cachedBehaviourStates = new List<bool>();
         private float originalAnimatorSpeed = 1f;
@@ -42,6 +67,18 @@ namespace LSP.Gameplay
         private bool lastKnownWorldAbnormal;
         private Quaternion cachedHeadLocalRotation;
         private bool hasCachedHeadRotation;
+        private Quaternion jitterOffsetLocal = Quaternion.identity;
+        private Quaternion jitterTargetLocal = Quaternion.identity;
+        private float jitterCountdown;
+
+        private enum JitterPhase
+        {
+            Idle,
+            MovingToOffset,
+            Returning
+        }
+
+        private JitterPhase jitterPhase = JitterPhase.Idle;
 
         public NpcState CurrentState => currentState;
 
@@ -104,13 +141,17 @@ namespace LSP.Gameplay
 
             if (currentState != NpcState.DeadStare)
             {
+                ResetJitterState(false);
                 return;
             }
 
             if (headTransform == null || playerTransform == null)
             {
+                ResetJitterState(false);
                 return;
             }
+
+            UpdateJitter(Time.deltaTime);
 
             Vector3 toPlayer = playerTransform.position - headTransform.position;
             if (toPlayer.sqrMagnitude <= Mathf.Epsilon)
@@ -197,6 +238,7 @@ namespace LSP.Gameplay
             CacheAnimatorState();
             DisableAnimator();
             CacheHeadRotation();
+            ResetJitterState(true);
         }
 
         private void ExitDeadStare()
@@ -204,6 +246,7 @@ namespace LSP.Gameplay
             RestoreBehaviours();
             RestoreAnimatorState();
             RestoreHeadRotation();
+            ResetJitterState(false);
         }
 
         private void DisableBehaviours()
@@ -292,13 +335,119 @@ namespace LSP.Gameplay
             if (parent != null)
             {
                 Quaternion targetLocal = Quaternion.Inverse(parent.rotation) * targetWorldRotation;
+                targetLocal = ApplyJitterToLocal(targetLocal);
                 Quaternion nextLocal = Quaternion.RotateTowards(headTransform.localRotation, targetLocal, headTurnSpeed * Time.deltaTime);
                 headTransform.localRotation = nextLocal;
             }
             else
             {
-                headTransform.rotation = Quaternion.RotateTowards(headTransform.rotation, targetWorldRotation, headTurnSpeed * Time.deltaTime);
+                Quaternion jitteredTarget = ApplyJitterToWorld(targetWorldRotation);
+                headTransform.rotation = Quaternion.RotateTowards(headTransform.rotation, jitteredTarget, headTurnSpeed * Time.deltaTime);
             }
+        }
+
+        private void UpdateJitter(float deltaTime)
+        {
+            if (!IsJitterActive())
+            {
+                ResetJitterState(false);
+                return;
+            }
+
+            switch (jitterPhase)
+            {
+                case JitterPhase.Idle:
+                    jitterOffsetLocal = Quaternion.identity;
+                    jitterTargetLocal = Quaternion.identity;
+                    jitterCountdown -= deltaTime;
+                    if (jitterCountdown <= 0f)
+                    {
+                        jitterTargetLocal = Quaternion.AngleAxis(GetNextJitterAngle(), Vector3.up);
+                        jitterPhase = JitterPhase.MovingToOffset;
+                    }
+                    break;
+
+                case JitterPhase.MovingToOffset:
+                    jitterOffsetLocal = RotateTowards(jitterOffsetLocal, jitterTargetLocal, jitterSnapSpeed, deltaTime);
+                    if (Quaternion.Angle(jitterOffsetLocal, jitterTargetLocal) <= 0.25f)
+                    {
+                        jitterTargetLocal = Quaternion.identity;
+                        jitterPhase = JitterPhase.Returning;
+                    }
+                    break;
+
+                case JitterPhase.Returning:
+                    jitterOffsetLocal = RotateTowards(jitterOffsetLocal, jitterTargetLocal, jitterRecoverySpeed, deltaTime);
+                    if (Quaternion.Angle(jitterOffsetLocal, Quaternion.identity) <= 0.25f)
+                    {
+                        jitterOffsetLocal = Quaternion.identity;
+                        jitterCountdown = GetNextJitterDelay();
+                        jitterPhase = JitterPhase.Idle;
+                    }
+                    break;
+            }
+        }
+
+        private Quaternion RotateTowards(Quaternion current, Quaternion target, float speed, float deltaTime)
+        {
+            if (speed <= 0f)
+            {
+                return target;
+            }
+
+            return Quaternion.RotateTowards(current, target, speed * deltaTime);
+        }
+
+        private Quaternion ApplyJitterToLocal(Quaternion targetLocal)
+        {
+            if (!IsJitterActive())
+            {
+                return targetLocal;
+            }
+
+            return targetLocal * jitterOffsetLocal;
+        }
+
+        private Quaternion ApplyJitterToWorld(Quaternion targetWorld)
+        {
+            if (!IsJitterActive())
+            {
+                return targetWorld;
+            }
+
+            return targetWorld * jitterOffsetLocal;
+        }
+
+        private bool IsJitterActive()
+        {
+            return headTransform != null && currentState == NpcState.DeadStare && jitterAngleDegrees > Mathf.Epsilon;
+        }
+
+        private void ResetJitterState(bool immediateStart)
+        {
+            jitterOffsetLocal = Quaternion.identity;
+            jitterTargetLocal = Quaternion.identity;
+            jitterPhase = JitterPhase.Idle;
+            jitterCountdown = immediateStart ? 0f : GetNextJitterDelay();
+        }
+
+        private float GetNextJitterDelay()
+        {
+            float min = Mathf.Max(0f, jitterIntervalRange.x);
+            float max = Mathf.Max(min, jitterIntervalRange.y);
+            return Random.Range(min, max);
+        }
+
+        private float GetNextJitterAngle()
+        {
+            if (jitterAngleDegrees <= 0f)
+            {
+                return 0f;
+            }
+
+            float magnitude = Random.Range(0.5f * jitterAngleDegrees, jitterAngleDegrees);
+            float direction = Random.value <= jitterRightBias ? 1f : -1f;
+            return magnitude * direction;
         }
 
         public void SetPlayerTransform(Transform player)
