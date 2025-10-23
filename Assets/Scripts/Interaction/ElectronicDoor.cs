@@ -22,6 +22,11 @@ namespace MuseumGame.Interaction
         [SerializeField] private float _moveSpeed = 3f;
         [SerializeField] private bool _startOpen;
 
+        [Header("Audio")]
+        [SerializeField] private AudioSource _audioSource;
+        [SerializeField] private AudioClip _openSfx;
+        [SerializeField] private AudioClip _closeSfx;
+
         [Header("Events")]
         [SerializeField] private UnityEvent _onOpened;
         [SerializeField] private UnityEvent _onClosed;
@@ -38,6 +43,11 @@ namespace MuseumGame.Interaction
 
         private void Awake()
         {
+            if (_audioSource == null)
+            {
+                _audioSource = GetComponent<AudioSource>();
+            }
+
             if (_leftDoor != null)
             {
                 _leftClosedLocalPos = _leftDoor.localPosition;
@@ -105,10 +115,12 @@ namespace MuseumGame.Interaction
             {
                 if (_isOpen)
                 {
+                    PlayClip(_openSfx);
                     _onOpened?.Invoke();
                 }
                 else
                 {
+                    PlayClip(_closeSfx);
                     _onClosed?.Invoke();
                 }
 
@@ -130,6 +142,25 @@ namespace MuseumGame.Interaction
             }
 
             panel.localPosition = Vector3.MoveTowards(panel.localPosition, targetLocalPos, _moveSpeed * Time.deltaTime);
+        }
+
+        private void PlayClip(AudioClip clip)
+        {
+            if (clip == null)
+            {
+                return;
+            }
+
+            if (_audioSource == null)
+            {
+                AudioSource.PlayClipAtPoint(clip, transform.position);
+                return;
+            }
+
+            if (_audioSource.isActiveAndEnabled)
+            {
+                _audioSource.PlayOneShot(clip);
+            }
         }
     }
 }
