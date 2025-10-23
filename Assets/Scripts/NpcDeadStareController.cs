@@ -40,6 +40,8 @@ namespace LSP.Gameplay
         private bool isSubscribed;
         private bool hasCachedWorldState;
         private bool lastKnownWorldAbnormal;
+        private Quaternion cachedHeadLocalRotation;
+        private bool hasCachedHeadRotation;
 
         public NpcState CurrentState => currentState;
 
@@ -56,6 +58,11 @@ namespace LSP.Gameplay
             }
 
             CacheBehaviourStates();
+
+            if (headTransform != null)
+            {
+                CacheHeadRotation();
+            }
 
             if (animator != null)
             {
@@ -112,7 +119,7 @@ namespace LSP.Gameplay
             }
 
             Quaternion targetRotation = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
-            headTransform.rotation = Quaternion.RotateTowards(headTransform.rotation, targetRotation, headTurnSpeed * Time.deltaTime);
+            RotateHeadTowards(targetRotation);
         }
 
         private void CacheBehaviourStates()
@@ -189,12 +196,14 @@ namespace LSP.Gameplay
             DisableBehaviours();
             CacheAnimatorState();
             DisableAnimator();
+            CacheHeadRotation();
         }
 
         private void ExitDeadStare()
         {
             RestoreBehaviours();
             RestoreAnimatorState();
+            RestoreHeadRotation();
         }
 
         private void DisableBehaviours()
@@ -248,6 +257,47 @@ namespace LSP.Gameplay
             {
                 animator.enabled = originalAnimatorEnabled;
                 animator.speed = originalAnimatorSpeed;
+            }
+        }
+
+        private void CacheHeadRotation()
+        {
+            if (headTransform == null)
+            {
+                return;
+            }
+
+            cachedHeadLocalRotation = headTransform.localRotation;
+            hasCachedHeadRotation = true;
+        }
+
+        private void RestoreHeadRotation()
+        {
+            if (!hasCachedHeadRotation || headTransform == null)
+            {
+                return;
+            }
+
+            headTransform.localRotation = cachedHeadLocalRotation;
+        }
+
+        private void RotateHeadTowards(Quaternion targetWorldRotation)
+        {
+            if (headTransform == null)
+            {
+                return;
+            }
+
+            Transform parent = headTransform.parent;
+            if (parent != null)
+            {
+                Quaternion targetLocal = Quaternion.Inverse(parent.rotation) * targetWorldRotation;
+                Quaternion nextLocal = Quaternion.RotateTowards(headTransform.localRotation, targetLocal, headTurnSpeed * Time.deltaTime);
+                headTransform.localRotation = nextLocal;
+            }
+            else
+            {
+                headTransform.rotation = Quaternion.RotateTowards(headTransform.rotation, targetWorldRotation, headTurnSpeed * Time.deltaTime);
             }
         }
 
