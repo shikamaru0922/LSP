@@ -74,6 +74,14 @@ namespace LSP.Gameplay
         [SerializeField]
         private AudioSource footstepAudioSource;
 
+        [Tooltip("Audio source used to play the monster's howl when it detects the player.")]
+        [SerializeField]
+        private AudioSource detectionAudioSource;
+
+        [Tooltip("Audio clip played when the monster first spots the player.")]
+        [SerializeField]
+        private AudioClip detectionHowlClip;
+
         [Tooltip("Maximum volume applied to the footstep audio when the monster is next to the player.")]
         [Range(0f, 1f)]
         [SerializeField]
@@ -182,6 +190,13 @@ namespace LSP.Gameplay
                 footstepAudioSource.playOnAwake = false;
                 footstepAudioSource.Stop();
             }
+
+            if (detectionAudioSource != null)
+            {
+                detectionAudioSource.loop = false;
+                detectionAudioSource.playOnAwake = false;
+                detectionAudioSource.Stop();
+            }
         }
 
         private void OnEnable()
@@ -265,15 +280,15 @@ namespace LSP.Gameplay
             bool allowVisionControl = currentState != MonsterState.Returning || !returningIgnoresVision;
             bool shouldHoldStationary = allowVisionControl && (inView || timeSinceLastSeen < visionHoldDuration);
 
+            if (canChase && currentState == MonsterState.Stationary)
+            {
+                currentState = MonsterState.Chasing;
+            }
+
             if (shouldHoldStationary)
             {
                 FreezeMoveSpeed();
                 FreezeAnimatorByVision();
-
-                if (allowVisionControl && currentState != MonsterState.Returning)
-                {
-                    currentState = MonsterState.Stationary;
-                }
             }
             else
             {
@@ -311,7 +326,30 @@ namespace LSP.Gameplay
                 {
                     ResumeNavMeshAgent();
                     ApplyAnimatorMovementState();
+                    PlayDetectionHowl();
                 }
+            }
+        }
+
+        private void PlayDetectionHowl()
+        {
+            if (detectionAudioSource != null)
+            {
+                if (detectionHowlClip != null)
+                {
+                    detectionAudioSource.PlayOneShot(detectionHowlClip);
+                }
+                else
+                {
+                    detectionAudioSource.Play();
+                }
+
+                return;
+            }
+
+            if (detectionHowlClip != null)
+            {
+                AudioSource.PlayClipAtPoint(detectionHowlClip, transform.position);
             }
         }
 
