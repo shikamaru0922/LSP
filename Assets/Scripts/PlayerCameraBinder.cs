@@ -39,6 +39,19 @@ namespace LSP.Gameplay
         [SerializeField]
         private float forcedFadeOutDuration = 0.25f;
 
+        [Header("Warning Blink Flashing")]
+        [Tooltip("Overrides the number of warning flashes if no eye controller is assigned.")]
+        [SerializeField]
+        private int defaultWarningFlashCount = 3;
+
+        [Tooltip("Seconds used to darken the overlay during each warning flash when the eye controller is missing.")]
+        [SerializeField]
+        private float defaultWarningDarkenDuration = 0.08f;
+
+        [Tooltip("Seconds used to lighten the overlay during each warning flash when the eye controller is missing.")]
+        [SerializeField]
+        private float defaultWarningLightenDuration = 0.08f;
+
         private Camera attachedCamera;
         private Coroutine blinkRoutine;
 
@@ -152,34 +165,77 @@ namespace LSP.Gameplay
 
         private System.Collections.IEnumerator BlinkRoutine(PlayerEyeControl.BlinkType blinkType, float duration)
         {
-            float fadeIn = blinkType == PlayerEyeControl.BlinkType.Forced ? forcedFadeInDuration : manualFadeInDuration;
-            float fadeOut = blinkType == PlayerEyeControl.BlinkType.Forced ? forcedFadeOutDuration : manualFadeOutDuration;
-
-            fadeIn = Mathf.Max(0f, fadeIn);
-            fadeOut = Mathf.Max(0f, fadeOut);
-
-            float fadeSum = fadeIn + fadeOut;
-            if (fadeSum > duration && fadeSum > 0f)
+            if (blinkType == PlayerEyeControl.BlinkType.Warning)
             {
-                float scale = duration / fadeSum;
-                fadeIn *= scale;
-                fadeOut *= scale;
-                fadeSum = fadeIn + fadeOut;
+                yield return WarningBlinkRoutine();
             }
-
-            float holdDuration = Mathf.Max(0f, duration - fadeSum);
-
-            yield return FadeOverlay(1f, fadeIn);
-
-            if (holdDuration > 0f)
+            else
             {
-                yield return new WaitForSeconds(holdDuration);
-            }
+                float fadeIn;
+                float fadeOut;
 
-            yield return FadeOverlay(0f, fadeOut);
+                switch (blinkType)
+                {
+                    case PlayerEyeControl.BlinkType.Forced:
+                        fadeIn = forcedFadeInDuration;
+                        fadeOut = forcedFadeOutDuration;
+                        break;
+                    default:
+                        fadeIn = manualFadeInDuration;
+                        fadeOut = manualFadeOutDuration;
+                        break;
+                }
+
+                fadeIn = Mathf.Max(0f, fadeIn);
+                fadeOut = Mathf.Max(0f, fadeOut);
+
+                float fadeSum = fadeIn + fadeOut;
+                if (fadeSum > duration && fadeSum > 0f)
+                {
+                    float scale = duration / fadeSum;
+                    fadeIn *= scale;
+                    fadeOut *= scale;
+                    fadeSum = fadeIn + fadeOut;
+                }
+
+                float holdDuration = Mathf.Max(0f, duration - fadeSum);
+
+                yield return FadeOverlay(1f, fadeIn);
+
+                if (holdDuration > 0f)
+                {
+                    yield return new WaitForSeconds(holdDuration);
+                }
+
+                yield return FadeOverlay(0f, fadeOut);
+            }
 
             blinkRoutine = null;
             UpdateOverlayImmediate();
+        }
+
+        private System.Collections.IEnumerator WarningBlinkRoutine()
+        {
+            int flashes = defaultWarningFlashCount;
+            float darken = defaultWarningDarkenDuration;
+            float lighten = defaultWarningLightenDuration;
+
+            if (eyeControl != null)
+            {
+                flashes = eyeControl.WarningBlinkFlashCount;
+                darken = eyeControl.WarningBlinkDarkenDuration;
+                lighten = eyeControl.WarningBlinkLightenDuration;
+            }
+
+            flashes = Mathf.Max(1, flashes);
+            darken = Mathf.Max(0f, darken);
+            lighten = Mathf.Max(0f, lighten);
+
+            for (int i = 0; i < flashes; i++)
+            {
+                yield return FadeOverlay(1f, darken);
+                yield return FadeOverlay(0f, lighten);
+            }
         }
 
         private System.Collections.IEnumerator FadeOverlay(float targetAlpha, float duration)
