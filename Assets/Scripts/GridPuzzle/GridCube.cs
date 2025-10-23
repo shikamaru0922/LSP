@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 
 namespace LSP.Puzzles
@@ -25,10 +26,40 @@ namespace LSP.Puzzles
         [Tooltip("Color used when the cube is active (green state).")]
         private Color activeColor = Color.green;
 
+        [Header("Feedback Settings")]
+        [SerializeField]
+        [Tooltip("Duration of the hover scale tween.")]
+        private float hoverTweenDuration = 0.2f;
+
+        [SerializeField]
+        [Tooltip("Scale multiplier applied while the cube is hovered by the player's ray.")]
+        private float hoverScaleMultiplier = 1.1f;
+
+        [SerializeField]
+        [Tooltip("Strength of the punch scale effect when the cube is clicked.")]
+        private float clickPunchStrength = 0.15f;
+
+        [SerializeField]
+        [Tooltip("Duration of the punch scale tween when the cube is clicked.")]
+        private float clickPunchDuration = 0.25f;
+
+        [SerializeField]
+        [Tooltip("How many oscillations occur during the click punch scale effect.")]
+        private int clickPunchVibrato = 8;
+
+        [SerializeField]
+        [Range(0f, 1f)]
+        [Tooltip("Elasticity of the click punch scale effect.")]
+        private float clickPunchElasticity = 0.75f;
+
         private readonly List<GridCube> neighbours = new List<GridCube>(4);
         private MaterialPropertyBlock propertyBlock;
         private GridPuzzleManager owner;
         private bool isActive;
+        private Vector3 initialScale;
+        private Tween hoverTween;
+        private Tween clickTween;
+        private bool isHovered;
 
         /// <summary>
         /// Current cube state. True when the cube is green (active).
@@ -48,6 +79,7 @@ namespace LSP.Puzzles
             }
 
             propertyBlock = new MaterialPropertyBlock();
+            initialScale = transform.localScale;
             ApplyColor();
         }
 
@@ -103,7 +135,28 @@ namespace LSP.Puzzles
 
         private void OnMouseDown()
         {
+            PlayClickFeedback();
             owner?.HandleCubeActivated(this);
+        }
+
+        private void OnMouseEnter()
+        {
+            isHovered = true;
+            PlayHoverFeedback();
+        }
+
+        private void OnMouseExit()
+        {
+            isHovered = false;
+            ResetHoverFeedback();
+        }
+
+        private void OnDisable()
+        {
+            hoverTween?.Kill();
+            clickTween?.Kill();
+            transform.localScale = initialScale;
+            isHovered = false;
         }
 
         private void ApplyColor()
@@ -148,6 +201,42 @@ namespace LSP.Puzzles
                 // Fallback for custom shaders without colour properties supported by MaterialPropertyBlock.
                 targetRenderer.material.color = targetColour;
             }
+        }
+
+        private void PlayHoverFeedback()
+        {
+            hoverTween?.Kill();
+            hoverTween = transform.DOScale(initialScale * hoverScaleMultiplier, hoverTweenDuration)
+                .SetEase(Ease.OutBack)
+                .SetUpdate(true);
+        }
+
+        private void ResetHoverFeedback()
+        {
+            hoverTween?.Kill();
+            hoverTween = transform.DOScale(initialScale, hoverTweenDuration)
+                .SetEase(Ease.OutBack)
+                .SetUpdate(true);
+        }
+
+        private void PlayClickFeedback()
+        {
+            clickTween?.Kill();
+
+            var baseScale = isHovered ? initialScale * hoverScaleMultiplier : initialScale;
+            transform.localScale = baseScale;
+
+            clickTween = transform.DOPunchScale(Vector3.one * clickPunchStrength, clickPunchDuration, clickPunchVibrato, clickPunchElasticity)
+                .SetEase(Ease.OutQuad)
+                .SetUpdate(true)
+                .OnComplete(() =>
+                {
+                    transform.localScale = baseScale;
+                    if (!isHovered)
+                    {
+                        ResetHoverFeedback();
+                    }
+                });
         }
     }
 }
