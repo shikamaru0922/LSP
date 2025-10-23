@@ -69,6 +69,35 @@ namespace LSP.Gameplay
         [SerializeField]
         private float walkingTransitionDuration = 0.1f;
 
+        [Header("Audio")]
+        [Tooltip("Looped footstep audio source that plays while the monster is moving.")]
+        [SerializeField]
+        private AudioSource footstepAudioSource;
+
+        [Tooltip("Maximum volume applied to the footstep audio when the monster is next to the player.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float footstepMaxVolume = 1f;
+
+        [Tooltip("Distance at which the footstep audio becomes silent.")]
+        [Min(0f)]
+        [SerializeField]
+        private float footstepAudibleDistance = 20f;
+
+        [Tooltip("Base pitch applied to the footstep audio when the monster is stationary.")]
+        [Min(0f)]
+        [SerializeField]
+        private float footstepBasePitch = 1f;
+
+        [Tooltip("Multiplier applied to the monster's movement speed to control footstep playback frequency.")]
+        [SerializeField]
+        private float footstepFrequencyMultiplier = 0.1f;
+
+        [Tooltip("Minimum movement speed required before footsteps are heard.")]
+        [Min(0f)]
+        [SerializeField]
+        private float footstepMovementThreshold = 0.1f;
+
         [Header("Player Proximity Restart")]
         [Tooltip("If enabled, the level restarts when the monster reaches the player.")]
         [SerializeField]
@@ -106,6 +135,7 @@ namespace LSP.Gameplay
         private bool walkingStateAvailable;
         private bool restartTriggered;
         private bool returningIgnoresVision;
+        private Vector3 previousPosition;
 
         public MonsterState CurrentState => currentState;
         public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
@@ -143,6 +173,15 @@ namespace LSP.Gameplay
                 cachedAnimatorEnabled = animator.enabled;
                 CacheAnimatorAnimationConfiguration();
             }
+
+            previousPosition = transform.position;
+
+            if (footstepAudioSource != null)
+            {
+                footstepAudioSource.loop = true;
+                footstepAudioSource.playOnAwake = false;
+                footstepAudioSource.Stop();
+            }
         }
 
         private void OnEnable()
@@ -174,10 +213,13 @@ namespace LSP.Gameplay
             RestoreAnimatorFromVision();
             UnsubscribeFromWorldEvent();
             returningIgnoresVision = false;
+            StopFootstepAudio();
         }
 
         private void Update()
         {
+            float deltaTime = Time.deltaTime;
+
             if (!isWorldAbnormal)
             {
                 if (currentState != MonsterState.Stationary)
@@ -188,14 +230,17 @@ namespace LSP.Gameplay
 
                 ApplyAnimatorMovementState();
                 CheckForProximityRestart();
+                UpdateFootstepAudio(0f);
+                previousPosition = transform.position;
                 return;
             }
 
-            float deltaTime = Time.deltaTime;
             UpdateStateFromVision(deltaTime);
             UpdateMovement(deltaTime);
             ApplyAnimatorMovementState();
             CheckForProximityRestart();
+            UpdateFootstepAudio(CalculateCurrentSpeed(deltaTime));
+            previousPosition = transform.position;
         }
 
         private void UpdateStateFromVision(float deltaTime)
@@ -430,6 +475,8 @@ namespace LSP.Gameplay
             {
                 transform.position = spawnPosition;
             }
+
+            previousPosition = transform.position;
         }
 
         public void SetPlayerVision(PlayerVision vision)
@@ -824,6 +871,65 @@ namespace LSP.Gameplay
             if ((transform.position - targetPosition).sqrMagnitude <= thresholdSqr)
             {
                 CompleteReturnToSpawn();
+            }
+        }
+
+        private float CalculateCurrentSpeed(float deltaTime)
+        {
+            if (IsNavMeshAgentAvailable && navMeshAgent.isOnNavMesh)
+            {
+                return navMeshAgent.velocity.magnitude;
+            }
+
+            if (deltaTime <= Mathf.Epsilon)
+            {
+                return 0f;
+            }
+
+            Vector3 displacement = transform.position - previousPosition;
+            displacement.y = 0f;
+            return displacement.magnitude / deltaTime;
+        }
+
+        private void UpdateFootstepAudio(float currentSpeed)
+        {
+            if (footstepAudioSource == null)
+            {
+                return;
+            }
+
+            bool shouldPlay = isWorldAbnormal && currentSpeed >= footstepMovementThreshold && !isMoveSpeedFrozen;
+
+            if (!shouldPlay)
+            {
+                StopFootstepAudio();
+                return;
+            }
+
+            float targetVolume = footstepMaxVolume;
+
+            if (chaseTarget != null && footstepAudibleDistance > 0f)
+            {
+                float distance = Vector3.Distance(transform.position, chaseTarget.position);
+                float attenuation = Mathf.Clamp01(1f - (distance / footstepAudibleDistance));
+                targetVolume *= attenuation;
+            }
+
+            footstepAudioSource.volume = targetVolume;
+            float targetPitch = footstepBasePitch + currentSpeed * footstepFrequencyMultiplier;
+            footstepAudioSource.pitch = Mathf.Max(0.01f, targetPitch);
+
+            if (!footstepAudioSource.isPlaying)
+            {
+                footstepAudioSource.Play();
+            }
+        }
+
+        private void StopFootstepAudio()
+        {
+            if (footstepAudioSource != null && footstepAudioSource.isPlaying)
+            {
+                footstepAudioSource.Stop();
             }
         }
 

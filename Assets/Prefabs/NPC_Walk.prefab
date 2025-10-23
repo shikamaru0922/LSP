@@ -61,7 +61,7 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 36078ab0369161e49a29d349ae3e0739,
         type: 3}
       propertyPath: m_Name
-      value: NPC
+      value: NPC_Walk
       objectReference: {fileID: 0}
     - target: {fileID: 5866666021909216657, guid: 36078ab0369161e49a29d349ae3e0739,
         type: 3}
@@ -109,6 +109,11 @@ MonoBehaviour:
   animator: {fileID: 6056019140510698651}
   behavioursToDisable: []
   headTurnSpeed: 360
+  jitterIntervalRange: {x: 0.1, y: 0.35}
+  jitterAngleDegrees: 45
+  jitterSnapSpeed: 1200
+  jitterRecoverySpeed: 360
+  jitterRightBias: 0.65
 --- !u!82 &7729917592003227400
 AudioSource:
   m_ObjectHideFlags: 0
