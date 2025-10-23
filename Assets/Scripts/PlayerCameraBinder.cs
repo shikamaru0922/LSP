@@ -39,6 +39,14 @@ namespace LSP.Gameplay
         [SerializeField]
         private float forcedFadeOutDuration = 0.25f;
 
+        [Tooltip("Seconds used to fade in the overlay for warning blinks when wetness is low.")]
+        [SerializeField]
+        private float warningFadeInDuration = 0.25f;
+
+        [Tooltip("Seconds used to fade out the overlay after a warning blink.")]
+        [SerializeField]
+        private float warningFadeOutDuration = 0.35f;
+
         private Camera attachedCamera;
         private Coroutine blinkRoutine;
 
@@ -152,8 +160,24 @@ namespace LSP.Gameplay
 
         private System.Collections.IEnumerator BlinkRoutine(PlayerEyeControl.BlinkType blinkType, float duration)
         {
-            float fadeIn = blinkType == PlayerEyeControl.BlinkType.Forced ? forcedFadeInDuration : manualFadeInDuration;
-            float fadeOut = blinkType == PlayerEyeControl.BlinkType.Forced ? forcedFadeOutDuration : manualFadeOutDuration;
+            float fadeIn;
+            float fadeOut;
+
+            switch (blinkType)
+            {
+                case PlayerEyeControl.BlinkType.Forced:
+                    fadeIn = forcedFadeInDuration;
+                    fadeOut = forcedFadeOutDuration;
+                    break;
+                case PlayerEyeControl.BlinkType.Warning:
+                    fadeIn = warningFadeInDuration;
+                    fadeOut = warningFadeOutDuration;
+                    break;
+                default:
+                    fadeIn = manualFadeInDuration;
+                    fadeOut = manualFadeOutDuration;
+                    break;
+            }
 
             fadeIn = Mathf.Max(0f, fadeIn);
             fadeOut = Mathf.Max(0f, fadeOut);

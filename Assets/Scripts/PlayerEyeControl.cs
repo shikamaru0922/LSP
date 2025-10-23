@@ -11,7 +11,8 @@ namespace LSP.Gameplay
         public enum BlinkType
         {
             Manual,
-            Forced
+            Forced,
+            Warning
         }
 
         [Header("Wetness Settings")]
@@ -42,9 +43,25 @@ namespace LSP.Gameplay
         [SerializeField]
         private int manualBlinkMouseButton = 0;
 
+        [Header("Low Wetness Warning")]
+        [Tooltip("Fraction of the maximum wetness that triggers the warning blink behaviour.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float warningWetnessThresholdFraction = 0.25f;
+
+        [Tooltip("Seconds the warning blink keeps the eyes closed when wetness is low.")]
+        [SerializeField]
+        private float warningBlinkDuration = 1.8f;
+
+        [Tooltip("Delay between warning blinks while the wetness remains below the threshold.")]
+        [SerializeField]
+        private float warningBlinkCooldown = 4f;
+
         private float currentWetness;
         private float forcedBlinkTimer;
         private float manualBlinkTimer;
+        private float warningBlinkTimer;
+        private float warningBlinkCooldownTimer;
         private bool eyesOpen = true;
 
         public float CurrentWetness => currentWetness;
@@ -92,7 +109,8 @@ namespace LSP.Gameplay
         public bool EyesOpen => eyesOpen;
         public bool IsForcedClosing => forcedBlinkTimer > 0f;
         public bool IsManualBlinking => manualBlinkTimer > 0f;
-        public bool IsBlinking => IsForcedClosing || IsManualBlinking;
+        public bool IsWarningBlinking => warningBlinkTimer > 0f;
+        public bool IsBlinking => IsForcedClosing || IsManualBlinking || IsWarningBlinking;
 
         public event Action EyesForcedClosed;
         public event Action EyesForcedOpened;
@@ -111,6 +129,7 @@ namespace LSP.Gameplay
             UpdateBlinkTimers(deltaTime);
             HandleInput();
             UpdateWetness(deltaTime);
+            UpdateWarningBlink(deltaTime);
         }
 
         private void HandleInput()
@@ -152,6 +171,51 @@ namespace LSP.Gameplay
             }
         }
 
+        private void UpdateWarningBlink(float deltaTime)
+        {
+            if (warningBlinkCooldownTimer > 0f)
+            {
+                warningBlinkCooldownTimer -= deltaTime;
+                if (warningBlinkCooldownTimer < 0f)
+                {
+                    warningBlinkCooldownTimer = 0f;
+                }
+            }
+
+            if (warningBlinkTimer > 0f)
+            {
+                warningBlinkTimer -= deltaTime;
+                if (warningBlinkTimer <= 0f)
+                {
+                    warningBlinkTimer = 0f;
+                    EndWarningBlink();
+                }
+
+                return;
+            }
+
+            if (IsForcedClosing || IsManualBlinking)
+            {
+                CancelWarningBlink(false);
+                return;
+            }
+
+            bool lowWetness = maximumWetness > Mathf.Epsilon && currentWetness <= maximumWetness * warningWetnessThresholdFraction;
+            if (!lowWetness)
+            {
+                CancelWarningBlink(true);
+                warningBlinkCooldownTimer = 0f;
+                return;
+            }
+
+            if (warningBlinkCooldownTimer > 0f)
+            {
+                return;
+            }
+
+            BeginWarningBlink();
+        }
+
         private void UpdateWetness(float deltaTime)
         {
             if (EyesOpen)
@@ -173,6 +237,8 @@ namespace LSP.Gameplay
 
         private void BeginManualBlink()
         {
+            CancelWarningBlink(false);
+            warningBlinkCooldownTimer = warningBlinkCooldown;
             manualBlinkTimer = manualBlinkDuration;
             eyesOpen = false;
             currentWetness = Mathf.Clamp(currentWetness + restoreWetnessPerManualBlink, 0f, maximumWetness);
@@ -181,7 +247,7 @@ namespace LSP.Gameplay
 
         private void EndManualBlink()
         {
-            eyesOpen = !IsForcedClosing;
+            eyesOpen = !IsForcedClosing && !IsWarningBlinking;
             BlinkEnded?.Invoke(BlinkType.Manual);
         }
 
@@ -192,6 +258,8 @@ namespace LSP.Gameplay
                 return;
             }
 
+            CancelWarningBlink(false);
+            warningBlinkCooldownTimer = warningBlinkCooldown;
             forcedBlinkTimer = forcedBlinkDuration;
             eyesOpen = false;
             EyesForcedClosed?.Invoke();
@@ -200,7 +268,7 @@ namespace LSP.Gameplay
 
         private void EndForcedBlink()
         {
-            if (!IsManualBlinking)
+            if (!IsManualBlinking && !IsWarningBlinking)
             {
                 eyesOpen = true;
                 BlinkEnded?.Invoke(BlinkType.Forced);
@@ -213,14 +281,62 @@ namespace LSP.Gameplay
             EyesForcedOpened?.Invoke();
         }
 
+        private void BeginWarningBlink()
+        {
+            float duration = Mathf.Max(0f, warningBlinkDuration);
+            warningBlinkTimer = duration;
+            eyesOpen = false;
+            BlinkStarted?.Invoke(BlinkType.Warning, duration);
+
+            if (warningBlinkTimer <= 0f)
+            {
+                EndWarningBlink();
+            }
+        }
+
+        private void EndWarningBlink()
+        {
+            warningBlinkCooldownTimer = warningBlinkCooldown;
+
+            if (!IsForcedClosing && !IsManualBlinking)
+            {
+                eyesOpen = true;
+            }
+
+            BlinkEnded?.Invoke(BlinkType.Warning);
+        }
+
+        private void CancelWarningBlink(bool notify)
+        {
+            if (warningBlinkTimer <= 0f)
+            {
+                return;
+            }
+
+            warningBlinkTimer = 0f;
+
+            if (!IsForcedClosing && !IsManualBlinking)
+            {
+                eyesOpen = true;
+            }
+
+            if (notify)
+            {
+                BlinkEnded?.Invoke(BlinkType.Warning);
+            }
+        }
+
         /// <summary>
         /// Instantly restores the wetness resource. Useful when restarting a level.
         /// </summary>
         public void ResetWetness()
         {
+            CancelWarningBlink(true);
             currentWetness = maximumWetness;
             forcedBlinkTimer = 0f;
             manualBlinkTimer = 0f;
+            warningBlinkTimer = 0f;
+            warningBlinkCooldownTimer = 0f;
             eyesOpen = true;
         }
 
@@ -233,6 +349,9 @@ namespace LSP.Gameplay
             restoreWetnessPerManualBlink = Mathf.Max(0f, restoreWetnessPerManualBlink);
             forcedBlinkDuration = Mathf.Max(0f, forcedBlinkDuration);
             manualBlinkDuration = Mathf.Max(0f, manualBlinkDuration);
+            warningWetnessThresholdFraction = Mathf.Clamp01(warningWetnessThresholdFraction);
+            warningBlinkDuration = Mathf.Max(0f, warningBlinkDuration);
+            warningBlinkCooldown = Mathf.Max(0f, warningBlinkCooldown);
         }
 #endif
     }
