@@ -881,6 +881,7 @@ namespace LSP.Gameplay
             }
 
             player.Kill();
+            this.gameObject.SetActive(false);
         }
 
         private bool IsNavMeshAgentAvailable => navMeshAgent != null && navMeshAgent.enabled;
