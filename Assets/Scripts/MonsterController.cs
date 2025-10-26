@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
-using UnityEngine.SceneManagement;
 
 namespace LSP.Gameplay
 {
@@ -142,6 +141,7 @@ namespace LSP.Gameplay
         private int walkingStateHash;
         private bool walkingStateAvailable;
         private bool restartTriggered;
+        private PlayerStateController cachedPlayerState;
         private bool returningIgnoresVision;
         private Vector3 previousPosition;
 
@@ -206,6 +206,7 @@ namespace LSP.Gameplay
             ApplyWorldAbnormalState(initialState);
             CacheAnimatorAnimationConfiguration();
             restartTriggered = false;
+            cachedPlayerState = ResolveChaseTargetPlayer();
             returningIgnoresVision = false;
             ApplyAnimatorMovementState();
         }
@@ -229,6 +230,7 @@ namespace LSP.Gameplay
             UnsubscribeFromWorldEvent();
             returningIgnoresVision = false;
             StopFootstepAudio();
+            cachedPlayerState = null;
         }
 
         private void Update()
@@ -391,7 +393,8 @@ namespace LSP.Gameplay
 
             if (player != null)
             {
-                player.Kill();
+                cachedPlayerState = player;
+                TriggerProximityRestart(player);
             }
         }
 
@@ -829,11 +832,29 @@ namespace LSP.Gameplay
             float distanceSqr = difference.sqrMagnitude;
             if (distanceSqr <= threshold * threshold)
             {
-                TriggerProximityRestart();
+                TriggerProximityRestart(ResolveChaseTargetPlayer());
             }
         }
 
-        private void TriggerProximityRestart()
+        private PlayerStateController ResolveChaseTargetPlayer()
+        {
+            if (cachedPlayerState != null)
+            {
+                return cachedPlayerState;
+            }
+
+            if (chaseTarget == null)
+            {
+                return null;
+            }
+
+            cachedPlayerState = chaseTarget.GetComponent<PlayerStateController>()
+                ?? chaseTarget.GetComponentInParent<PlayerStateController>();
+
+            return cachedPlayerState;
+        }
+
+        private void TriggerProximityRestart(PlayerStateController playerOverride = null)
         {
             if (restartTriggered)
             {
@@ -842,17 +863,24 @@ namespace LSP.Gameplay
 
             restartTriggered = true;
 
-            Scene activeScene = SceneManager.GetActiveScene();
-            if (!activeScene.IsValid())
+            PlayerStateController player = playerOverride ?? ResolveChaseTargetPlayer();
+            if (player == null)
             {
+                Debug.LogWarning("MonsterController could not find a PlayerStateController to kill.");
                 return;
             }
 
-            string sceneToLoad = !string.IsNullOrWhiteSpace(postEncounterSceneName)
-                ? postEncounterSceneName
-                : activeScene.name;
+            if (!string.IsNullOrWhiteSpace(postEncounterSceneName))
+            {
+                var deathSequence = player.GetComponent<PlayerExecutionDeathSequence>()
+                    ?? player.GetComponentInChildren<PlayerExecutionDeathSequence>();
+                if (deathSequence != null)
+                {
+                    deathSequence.OverrideSceneToLoad(postEncounterSceneName);
+                }
+            }
 
-            SceneManager.LoadScene(sceneToLoad);
+            player.Kill();
         }
 
         private bool IsNavMeshAgentAvailable => navMeshAgent != null && navMeshAgent.enabled;

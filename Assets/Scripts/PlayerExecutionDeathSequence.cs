@@ -45,6 +45,7 @@ namespace LSP.Gameplay
 
         private Coroutine deathRoutine;
         private bool deathCompleted;
+        private string sceneToLoadOverride;
 
         private void Reset()
         {
@@ -96,6 +97,7 @@ namespace LSP.Gameplay
             }
 
             deathCompleted = false;
+            sceneToLoadOverride = null;
             HideExecutionModel();
         }
 
@@ -108,6 +110,21 @@ namespace LSP.Gameplay
             {
                 CompleteDeath();
             }
+        }
+
+        /// <summary>
+        /// Overrides the scene that will be loaded when the death sequence completes.
+        /// Passing <c>null</c> or whitespace clears the override.
+        /// </summary>
+        public void OverrideSceneToLoad(string sceneName)
+        {
+            if (string.IsNullOrWhiteSpace(sceneName))
+            {
+                sceneToLoadOverride = null;
+                return;
+            }
+
+            sceneToLoadOverride = sceneName;
         }
 
         private void HandlePlayerKilled()
@@ -186,7 +203,9 @@ namespace LSP.Gameplay
                 deathRoutine = null;
             }
 
-            string targetScene = sceneToLoad;
+            string targetScene = !string.IsNullOrWhiteSpace(sceneToLoadOverride)
+                ? sceneToLoadOverride
+                : sceneToLoad;
             if (string.IsNullOrWhiteSpace(targetScene) && reloadCurrentSceneWhenEmpty)
             {
                 Scene currentScene = SceneManager.GetActiveScene();
@@ -198,6 +217,7 @@ namespace LSP.Gameplay
 
             if (!string.IsNullOrWhiteSpace(targetScene))
             {
+                sceneToLoadOverride = null;
                 SceneManager.LoadScene(targetScene);
             }
         }
