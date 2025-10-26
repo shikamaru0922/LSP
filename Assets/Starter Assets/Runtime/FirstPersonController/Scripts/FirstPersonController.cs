@@ -211,12 +211,11 @@ namespace StarterAssets
 					_verticalVelocity = -2f;
 				}
 
-				// Jump
-				if (_input.jump && _jumpTimeoutDelta <= 0.0f)
-				{
-					// the square root of H * -2 * G = how much velocity needed to reach desired height
-					_verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
-				}
+                                // Jumping is disabled for this project, consume the input so it has no effect.
+                                if (_input.jump)
+                                {
+                                        _input.jump = false;
+                                }
 
 				// jump timeout
 				if (_jumpTimeoutDelta >= 0.0f)

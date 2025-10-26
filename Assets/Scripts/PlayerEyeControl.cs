@@ -39,9 +39,9 @@ namespace LSP.Gameplay
         private float manualBlinkDuration = 0.5f;
 
         [Header("Input")]
-        [Tooltip("Mouse button used to trigger a manual blink.")]
+        [Tooltip("Key used to trigger a manual blink.")]
         [SerializeField]
-        private int manualBlinkMouseButton = 0;
+        private KeyCode manualBlinkKey = KeyCode.Space;
 
         [Header("Low Wetness Warning")]
         [Tooltip("Fraction of the maximum wetness that triggers the warning blink behaviour.")]
@@ -165,7 +165,7 @@ namespace LSP.Gameplay
                 return;
             }
 
-            if (Input.GetMouseButtonDown(manualBlinkMouseButton))
+            if (Input.GetKeyDown(manualBlinkKey))
             {
                 BeginManualBlink();
             }

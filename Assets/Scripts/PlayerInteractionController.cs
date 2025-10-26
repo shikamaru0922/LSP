@@ -20,7 +20,7 @@ namespace LSP.Gameplay
 
         [SerializeField]
         [Tooltip("Maximum distance from the camera that the player can interact with objects.")]
-        private float interactionDistance = 3f;
+        private float interactionDistance = 1f;
 
         [SerializeField]
         [Tooltip("Physics layers considered valid when searching for interactables.")]

@@ -227,7 +227,7 @@ MonoBehaviour:
   restoreWetnessPerManualBlink: 5
   forcedBlinkDuration: 3
   manualBlinkDuration: 1
-  manualBlinkMouseButton: 0
+  manualBlinkKey: 32
   warningWetnessThresholdFraction: 0.25
   warningBlinkFlashCount: 3
   warningBlinkDarkenDuration: 0.7
@@ -809,7 +809,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   interactKey: 102
   interactionCamera: {fileID: 0}
-  interactionDistance: 3
+  interactionDistance: 1
   interactableLayers:
     serializedVersion: 2
     m_Bits: 4294967295
