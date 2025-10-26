@@ -13,6 +13,7 @@ namespace LSP.Gameplay.Interactions
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Collider))]
+    [AddComponentMenu("LSP/Interactions/Gravity Switch")]
     public class GravitySwitch : MonoBehaviour
     {
         [Serializable]
@@ -23,15 +24,15 @@ namespace LSP.Gameplay.Interactions
         [Header("Events")]
         [SerializeField]
         [Tooltip("Invoked whenever the pressed state changes.")]
-        private SwitchStateEvent stateChanged;
+        private SwitchStateEvent stateChanged = new SwitchStateEvent();
 
         [SerializeField]
         [Tooltip("Raised when the switch is pressed.")]
-        private UnityEvent onPressed;
+        private UnityEvent onPressed = new UnityEvent();
 
         [SerializeField]
         [Tooltip("Raised when the switch is released.")]
-        private UnityEvent onReleased;
+        private UnityEvent onReleased = new UnityEvent();
 
         private readonly HashSet<Collider> activeColliders = new HashSet<Collider>();
 
@@ -45,10 +46,47 @@ namespace LSP.Gameplay.Interactions
         /// </summary>
         public event Action<GravitySwitch> PressedStateChanged;
 
+        /// <summary>
+        /// UnityEvent exposed for designers to respond to pressed state changes.
+        /// </summary>
+        public SwitchStateEvent StateChangedEvent => stateChanged;
+
+        /// <summary>
+        /// UnityEvent exposed for designers to respond when the switch is pressed.
+        /// </summary>
+        public UnityEvent OnPressedEvent => onPressed;
+
+        /// <summary>
+        /// UnityEvent exposed for designers to respond when the switch is released.
+        /// </summary>
+        public UnityEvent OnReleasedEvent => onReleased;
+
         private void Reset()
         {
             var triggerCollider = GetComponent<Collider>();
             triggerCollider.isTrigger = true;
+        }
+
+        private void OnValidate()
+        {
+            var triggerCollider = GetComponent<Collider>();
+            if (triggerCollider != null && !triggerCollider.isTrigger)
+            {
+                triggerCollider.isTrigger = true;
+            }
+        }
+
+        private void FixedUpdate()
+        {
+            if (activeColliders.Count == 0)
+            {
+                return;
+            }
+
+            if (RemoveInvalidColliders() && activeColliders.Count == 0)
+            {
+                SetPressed(false);
+            }
         }
 
         private void OnTriggerEnter(Collider other)
@@ -95,6 +133,24 @@ namespace LSP.Gameplay.Interactions
         {
             activeColliders.Clear();
             SetPressed(pressed);
+        }
+
+        private bool RemoveInvalidColliders()
+        {
+            var removedAny = false;
+
+            activeColliders.RemoveWhere(collider =>
+            {
+                if (collider != null && collider.enabled && collider.gameObject.activeInHierarchy)
+                {
+                    return false;
+                }
+
+                removedAny = true;
+                return true;
+            });
+
+            return removedAny;
         }
 
         private bool IsValidActivator(Collider collider)

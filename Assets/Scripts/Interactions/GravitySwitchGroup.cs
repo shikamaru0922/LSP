@@ -10,6 +10,7 @@ namespace LSP.Gameplay.Interactions
     /// require players and monsters to cooperate across chained switches.
     /// </summary>
     [DisallowMultipleComponent]
+    [AddComponentMenu("LSP/Interactions/Gravity Switch Group")]
     public class GravitySwitchGroup : MonoBehaviour
     {
         [System.Serializable]
@@ -28,13 +29,13 @@ namespace LSP.Gameplay.Interactions
 
         [Header("Events")]
         [SerializeField]
-        private GroupStateEvent stateChanged;
+        private GroupStateEvent stateChanged = new GroupStateEvent();
 
         [SerializeField]
-        private UnityEvent onActivated;
+        private UnityEvent onActivated = new UnityEvent();
 
         [SerializeField]
-        private UnityEvent onDeactivated;
+        private UnityEvent onDeactivated = new UnityEvent();
 
         private readonly List<GravitySwitch> uniqueSwitches = new List<GravitySwitch>();
 
@@ -42,6 +43,21 @@ namespace LSP.Gameplay.Interactions
         /// True when the group has reached the required active count.
         /// </summary>
         public bool IsActive { get; private set; }
+
+        /// <summary>
+        /// UnityEvent exposed for designers to respond when the group activation state changes.
+        /// </summary>
+        public GroupStateEvent StateChangedEvent => stateChanged;
+
+        /// <summary>
+        /// UnityEvent exposed for designers to respond when the group activates.
+        /// </summary>
+        public UnityEvent OnActivatedEvent => onActivated;
+
+        /// <summary>
+        /// UnityEvent exposed for designers to respond when the group deactivates.
+        /// </summary>
+        public UnityEvent OnDeactivatedEvent => onDeactivated;
 
         private void OnEnable()
         {
