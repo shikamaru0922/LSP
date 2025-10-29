@@ -13,9 +13,16 @@ namespace LSP.Gameplay
     {
         public static MonsterHowlCoordinator Instance { get; private set; }
 
+        [Header("Audio")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float detectionHowlVolume = 1f;
+
         private readonly HashSet<MonsterController> registeredMonsters = new HashSet<MonsterController>();
         private MonsterController activeMonster;
         private Coroutine releaseRoutine;
+
+        public float DetectionHowlVolume => Mathf.Clamp01(detectionHowlVolume);
 
         private void Awake()
         {
@@ -36,6 +43,14 @@ namespace LSP.Gameplay
             {
                 RegisterMonster(monster);
             }
+
+            ApplyVolumeToRegisteredMonsters();
+        }
+
+        private void OnValidate()
+        {
+            detectionHowlVolume = Mathf.Clamp01(detectionHowlVolume);
+            ApplyVolumeToRegisteredMonsters();
         }
 
         private void OnDisable()
@@ -62,6 +77,16 @@ namespace LSP.Gameplay
             }
 
             registeredMonsters.Add(monster);
+            monster.ApplyDetectionHowlVolume(DetectionHowlVolume);
+        }
+
+        /// <summary>
+        /// Sets the master volume applied to all monster detection howls.
+        /// </summary>
+        public void SetDetectionHowlVolume(float volume)
+        {
+            detectionHowlVolume = Mathf.Clamp01(volume);
+            ApplyVolumeToRegisteredMonsters();
         }
 
         /// <summary>
@@ -128,6 +153,18 @@ namespace LSP.Gameplay
             }
 
             ReleaseActiveMonster();
+        }
+
+        private void ApplyVolumeToRegisteredMonsters()
+        {
+            float volume = DetectionHowlVolume;
+
+            foreach (MonsterController monster in registeredMonsters)
+            {
+                monster?.ApplyDetectionHowlVolume(volume);
+            }
+
+            registeredMonsters.RemoveWhere(monster => monster == null);
         }
 
         private IEnumerator ReleaseAfterDelay(float duration)

@@ -145,6 +145,8 @@ namespace LSP.Gameplay
         private bool returningIgnoresVision;
         private Vector3 previousPosition;
         private Coroutine detectionHowlReleaseRoutine;
+        private float detectionHowlBaseVolume = 1f;
+        private float detectionHowlVolumeMultiplier = 1f;
 
         public MonsterState CurrentState => currentState;
         public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
@@ -194,10 +196,17 @@ namespace LSP.Gameplay
 
             if (detectionAudioSource != null)
             {
+                detectionHowlBaseVolume = detectionAudioSource.volume;
                 detectionAudioSource.loop = false;
                 detectionAudioSource.playOnAwake = false;
                 detectionAudioSource.Stop();
             }
+            else
+            {
+                detectionHowlBaseVolume = 1f;
+            }
+
+            detectionHowlVolumeMultiplier = 1f;
         }
 
         private void OnEnable()
@@ -337,6 +346,16 @@ namespace LSP.Gameplay
             }
         }
 
+        public void ApplyDetectionHowlVolume(float volumeMultiplier)
+        {
+            detectionHowlVolumeMultiplier = Mathf.Clamp01(volumeMultiplier);
+
+            if (detectionAudioSource != null)
+            {
+                detectionAudioSource.volume = detectionHowlBaseVolume * detectionHowlVolumeMultiplier;
+            }
+        }
+
         private void PlayDetectionHowl()
         {
             AudioClip howlClip = detectionHowlClip;
@@ -348,11 +367,14 @@ namespace LSP.Gameplay
 
             float howlDuration = howlClip != null ? howlClip.length : 0f;
             MonsterHowlCoordinator coordinator = MonsterHowlCoordinator.Instance;
+            float howlVolumeMultiplier = coordinator != null ? coordinator.DetectionHowlVolume : 1f;
 
             if (coordinator != null && !coordinator.TryBeginHowl(this, howlDuration))
             {
                 return;
             }
+
+            ApplyDetectionHowlVolume(howlVolumeMultiplier);
 
             if (detectionAudioSource != null)
             {
@@ -367,7 +389,8 @@ namespace LSP.Gameplay
             }
             else if (detectionHowlClip != null)
             {
-                AudioSource.PlayClipAtPoint(detectionHowlClip, transform.position);
+                float playbackVolume = detectionHowlBaseVolume * detectionHowlVolumeMultiplier;
+                AudioSource.PlayClipAtPoint(detectionHowlClip, transform.position, playbackVolume);
             }
 
             if (coordinator != null)
