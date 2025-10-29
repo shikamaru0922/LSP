@@ -144,6 +144,7 @@ namespace LSP.Gameplay
         private PlayerStateController cachedPlayerState;
         private bool returningIgnoresVision;
         private Vector3 previousPosition;
+        private Coroutine detectionHowlReleaseRoutine;
 
         public MonsterState CurrentState => currentState;
         public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
@@ -209,6 +210,7 @@ namespace LSP.Gameplay
             cachedPlayerState = ResolveChaseTargetPlayer();
             returningIgnoresVision = false;
             ApplyAnimatorMovementState();
+            MonsterHowlCoordinator.Instance?.RegisterMonster(this);
         }
 
         private void OnDisable()
@@ -231,6 +233,8 @@ namespace LSP.Gameplay
             returningIgnoresVision = false;
             StopFootstepAudio();
             cachedPlayerState = null;
+            StopDetectionHowlControl();
+            MonsterHowlCoordinator.Instance?.UnregisterMonster(this);
         }
 
         private void Update()
@@ -335,6 +339,21 @@ namespace LSP.Gameplay
 
         private void PlayDetectionHowl()
         {
+            AudioClip howlClip = detectionHowlClip;
+
+            if (howlClip == null && detectionAudioSource != null)
+            {
+                howlClip = detectionAudioSource.clip;
+            }
+
+            float howlDuration = howlClip != null ? howlClip.length : 0f;
+            MonsterHowlCoordinator coordinator = MonsterHowlCoordinator.Instance;
+
+            if (coordinator != null && !coordinator.TryBeginHowl(this, howlDuration))
+            {
+                return;
+            }
+
             if (detectionAudioSource != null)
             {
                 if (detectionHowlClip != null)
@@ -345,14 +364,46 @@ namespace LSP.Gameplay
                 {
                     detectionAudioSource.Play();
                 }
-
-                return;
             }
-
-            if (detectionHowlClip != null)
+            else if (detectionHowlClip != null)
             {
                 AudioSource.PlayClipAtPoint(detectionHowlClip, transform.position);
             }
+
+            if (coordinator != null)
+            {
+                if (howlDuration > 0f)
+                {
+                    if (detectionHowlReleaseRoutine != null)
+                    {
+                        StopCoroutine(detectionHowlReleaseRoutine);
+                    }
+
+                    detectionHowlReleaseRoutine = StartCoroutine(ReleaseHowlAfterDelay(howlDuration));
+                }
+                else
+                {
+                    coordinator.EndHowl(this);
+                }
+            }
+        }
+
+        private IEnumerator ReleaseHowlAfterDelay(float duration)
+        {
+            yield return new WaitForSeconds(duration);
+            MonsterHowlCoordinator.Instance?.EndHowl(this);
+            detectionHowlReleaseRoutine = null;
+        }
+
+        private void StopDetectionHowlControl()
+        {
+            if (detectionHowlReleaseRoutine != null)
+            {
+                StopCoroutine(detectionHowlReleaseRoutine);
+                detectionHowlReleaseRoutine = null;
+            }
+
+            MonsterHowlCoordinator.Instance?.EndHowl(this);
         }
 
         private void UpdateMovement(float deltaTime)
