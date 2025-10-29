@@ -144,6 +144,9 @@ namespace LSP.Gameplay
         private PlayerStateController cachedPlayerState;
         private bool returningIgnoresVision;
         private Vector3 previousPosition;
+        private Coroutine detectionHowlReleaseRoutine;
+        private float detectionHowlBaseVolume = 1f;
+        private float detectionHowlVolumeMultiplier = 1f;
 
         public MonsterState CurrentState => currentState;
         public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
@@ -193,10 +196,17 @@ namespace LSP.Gameplay
 
             if (detectionAudioSource != null)
             {
+                detectionHowlBaseVolume = detectionAudioSource.volume;
                 detectionAudioSource.loop = false;
                 detectionAudioSource.playOnAwake = false;
                 detectionAudioSource.Stop();
             }
+            else
+            {
+                detectionHowlBaseVolume = 1f;
+            }
+
+            detectionHowlVolumeMultiplier = 1f;
         }
 
         private void OnEnable()
@@ -209,6 +219,7 @@ namespace LSP.Gameplay
             cachedPlayerState = ResolveChaseTargetPlayer();
             returningIgnoresVision = false;
             ApplyAnimatorMovementState();
+            MonsterHowlCoordinator.Instance?.RegisterMonster(this);
         }
 
         private void OnDisable()
@@ -231,6 +242,8 @@ namespace LSP.Gameplay
             returningIgnoresVision = false;
             StopFootstepAudio();
             cachedPlayerState = null;
+            StopDetectionHowlControl();
+            MonsterHowlCoordinator.Instance?.UnregisterMonster(this);
         }
 
         private void Update()
@@ -333,8 +346,36 @@ namespace LSP.Gameplay
             }
         }
 
+        public void ApplyDetectionHowlVolume(float volumeMultiplier)
+        {
+            detectionHowlVolumeMultiplier = Mathf.Clamp01(volumeMultiplier);
+
+            if (detectionAudioSource != null)
+            {
+                detectionAudioSource.volume = detectionHowlBaseVolume * detectionHowlVolumeMultiplier;
+            }
+        }
+
         private void PlayDetectionHowl()
         {
+            AudioClip howlClip = detectionHowlClip;
+
+            if (howlClip == null && detectionAudioSource != null)
+            {
+                howlClip = detectionAudioSource.clip;
+            }
+
+            float howlDuration = howlClip != null ? howlClip.length : 0f;
+            MonsterHowlCoordinator coordinator = MonsterHowlCoordinator.Instance;
+            float howlVolumeMultiplier = coordinator != null ? coordinator.DetectionHowlVolume : 1f;
+
+            if (coordinator != null && !coordinator.TryBeginHowl(this, howlDuration))
+            {
+                return;
+            }
+
+            ApplyDetectionHowlVolume(howlVolumeMultiplier);
+
             if (detectionAudioSource != null)
             {
                 if (detectionHowlClip != null)
@@ -345,14 +386,47 @@ namespace LSP.Gameplay
                 {
                     detectionAudioSource.Play();
                 }
-
-                return;
             }
-
-            if (detectionHowlClip != null)
+            else if (detectionHowlClip != null)
             {
-                AudioSource.PlayClipAtPoint(detectionHowlClip, transform.position);
+                float playbackVolume = detectionHowlBaseVolume * detectionHowlVolumeMultiplier;
+                AudioSource.PlayClipAtPoint(detectionHowlClip, transform.position, playbackVolume);
             }
+
+            if (coordinator != null)
+            {
+                if (howlDuration > 0f)
+                {
+                    if (detectionHowlReleaseRoutine != null)
+                    {
+                        StopCoroutine(detectionHowlReleaseRoutine);
+                    }
+
+                    detectionHowlReleaseRoutine = StartCoroutine(ReleaseHowlAfterDelay(howlDuration));
+                }
+                else
+                {
+                    coordinator.EndHowl(this);
+                }
+            }
+        }
+
+        private IEnumerator ReleaseHowlAfterDelay(float duration)
+        {
+            yield return new WaitForSeconds(duration);
+            MonsterHowlCoordinator.Instance?.EndHowl(this);
+            detectionHowlReleaseRoutine = null;
+        }
+
+        private void StopDetectionHowlControl()
+        {
+            if (detectionHowlReleaseRoutine != null)
+            {
+                StopCoroutine(detectionHowlReleaseRoutine);
+                detectionHowlReleaseRoutine = null;
+            }
+
+            MonsterHowlCoordinator.Instance?.EndHowl(this);
         }
 
         private void UpdateMovement(float deltaTime)
