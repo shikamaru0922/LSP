@@ -34,33 +34,12 @@ namespace LSP.Gameplay
 
         private void OnEnable()
         {
-            UpdateSliderImmediate();
-        }
-
-        private void Update()
-        {
-            UpdateSliderImmediate();
-        }
-
-        private void UpdateSliderImmediate()
-        {
-            if (wetnessSlider == null || eyeControl == null)
+            if (wetnessSlider != null)
             {
-                return;
+                wetnessSlider.gameObject.SetActive(false);
             }
 
-            float maxWetness = Mathf.Max(eyeControl.MaximumWetness, Mathf.Epsilon);
-            float wetnessValue = Mathf.Clamp(eyeControl.CurrentWetness, 0f, maxWetness);
-
-            if (useNormalisedValue)
-            {
-                wetnessSlider.normalizedValue = wetnessValue / maxWetness;
-            }
-            else
-            {
-                wetnessSlider.maxValue = maxWetness;
-                wetnessSlider.value = wetnessValue;
-            }
+            enabled = false;
         }
     }
 }
