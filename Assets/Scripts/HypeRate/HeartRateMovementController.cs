@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using StarterAssets;
 
 namespace LSP.Gameplay
 {
@@ -17,7 +18,7 @@ namespace LSP.Gameplay
         }
 
         [Header("References")]
-        [SerializeField] private PlayerStateController playerState;
+        [SerializeField] private FirstPersonController firstPersonController;
 
         [Header("Movement Speeds")]
         [Tooltip("Speed applied while the player is considered to be actively exercising.")]
@@ -80,6 +81,7 @@ namespace LSP.Gameplay
         private float enterTimer;
         private float exitTimer;
         private bool isExerciseActive;
+        private float sprintToMoveRatio = 1f;
 
         private int lastHeartRate;
         private float lastHeartRateSampleTime;
@@ -182,19 +184,26 @@ namespace LSP.Gameplay
 
         private void Reset()
         {
-            playerState = GetComponent<PlayerStateController>();
+            firstPersonController = GetComponent<FirstPersonController>();
         }
 
         private void Awake()
         {
-            if (playerState == null)
+            if (firstPersonController == null)
             {
-                playerState = GetComponent<PlayerStateController>();
+                firstPersonController = GetComponent<FirstPersonController>();
             }
 
-            if (playerState != null && Mathf.Approximately(activeMovementSpeed, 0f))
+            if (firstPersonController != null)
             {
-                activeMovementSpeed = playerState.MovementSpeed;
+                sprintToMoveRatio = firstPersonController.MoveSpeed > 0f
+                    ? firstPersonController.SprintSpeed / firstPersonController.MoveSpeed
+                    : 1f;
+
+                if (Mathf.Approximately(activeMovementSpeed, 0f))
+                {
+                    activeMovementSpeed = firstPersonController.MoveSpeed;
+                }
             }
 
             ResetDetectionState();
@@ -202,7 +211,7 @@ namespace LSP.Gameplay
 
         private void Update()
         {
-            if (playerState == null)
+            if (firstPersonController == null)
             {
                 return;
             }
@@ -259,7 +268,8 @@ namespace LSP.Gameplay
         private void ApplyMovementSpeed()
         {
             float targetSpeed = isExerciseActive ? activeMovementSpeed : (lockMovementWhenInactive ? 0f : inactiveMovementSpeed);
-            playerState.MovementSpeed = targetSpeed;
+            firstPersonController.MoveSpeed = targetSpeed;
+            firstPersonController.SprintSpeed = targetSpeed * sprintToMoveRatio;
         }
 
         public void ResetDetectionState()
