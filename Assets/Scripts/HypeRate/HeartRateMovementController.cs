@@ -1,186 +1,146 @@
-using System;
+using System.Collections.Generic;
 using UnityEngine;
 using StarterAssets;
 
 namespace LSP.Gameplay
 {
     /// <summary>
-    /// Dynamically adjusts the player's movement speed based on live heart rate data.
-    /// Supports two detection strategies that can be swapped at runtime so designers
-    /// can compare the behaviours in-game.
+    /// Drives the player's movement speed directly from heart rate data using the
+    /// provided physiological baseline and tuning curve.
     /// </summary>
     public class HeartRateMovementController : MonoBehaviour
     {
-        public enum DetectionMode
-        {
-            MhrPercentage = 0,
-            RateOfChangeAndHrv = 1
-        }
-
         [Header("References")]
         [SerializeField] private FirstPersonController firstPersonController;
 
-        [Header("Movement Speeds")]
-        [Tooltip("Speed applied while the player is considered to be actively exercising.")]
-        [SerializeField] private float activeMovementSpeed = 3.5f;
+        [Header("Calibration")]
+        [Tooltip("Automatically begins the resting heart rate calibration when the object awakens.")]
+        [SerializeField] private bool autoStartCalibration = true;
 
-        [Tooltip("Speed applied when the player is idle/under threshold.")]
-        [SerializeField] private float inactiveMovementSpeed = 0.1f;
+        [Tooltip("Duration of the calibration window in seconds (samples are taken once per second).")]
+        [SerializeField] private float calibrationDurationSeconds = 180f;
 
-        [Tooltip("If enabled, the inactive speed is forced to 0 so the player cannot move unless in exercise mode.")]
-        [SerializeField] private bool lockMovementWhenInactive;
+        [Tooltip("Initial portion of the calibration window to discard to avoid ramp-up noise.")]
+        [SerializeField] private float calibrationDiscardInitialSeconds = 10f;
 
-        [Header("Mode Switching")]
-        [Tooltip("Allows switching between detection schemes at runtime without the debug panel.")]
-        [SerializeField] private bool enableModeHotkeys = true;
+        [Tooltip("Minimum number of samples required to accept the calibration result.")]
+        [SerializeField] private int calibrationMinimumSamples = 30;
 
-        [Tooltip("Press to toggle between the two detection modes.")]
-        [SerializeField] private KeyCode toggleModeKey = KeyCode.Tab;
+        [Header("Heart Rate Targets")]
+        [Tooltip("Heart rate must exceed the resting value by this offset to hit the neutral speed.")]
+        [SerializeField] private float activationOffsetBpm = 8f;
 
-        [Tooltip("Directly select the MHR% mode.")]
-        [SerializeField] private KeyCode selectMhrModeKey = KeyCode.Alpha1;
+        [Tooltip("Speed applied when the player's heart rate exactly meets the target.")]
+        [SerializeField] private float normalSpeed = 3.5f;
 
-        [Tooltip("Directly select the HRV + change-rate mode.")]
-        [SerializeField] private KeyCode selectHrvModeKey = KeyCode.Alpha2;
+        [Tooltip("Minimum speed applied when the heart rate is well below the target.")]
+        [SerializeField] private float minimumSpeed = 0.5f;
 
-        [Header("Detection Mode")]
-        [SerializeField] private DetectionMode detectionMode = DetectionMode.MhrPercentage;
+        [Tooltip("Maximum speed applied when the heart rate is well above the target.")]
+        [SerializeField] private float maximumSpeed = 6f;
 
-        [Header("MHR Percentage Settings")]
-        [Tooltip("Player age used to calculate max heart rate.")]
-        [SerializeField] private int playerAge = 25;
+        [Tooltip("Heart rate band below the target before speed reaches the minimum.")]
+        [SerializeField] private float decelerationRangeBpm = 15f;
 
-        [Tooltip("Percentage of MHR required to be considered exercising.")]
-        [SerializeField, Range(0.1f, 1f)] private float activationPercent = 0.6f;
+        [Tooltip("Heart rate band above the target before speed reaches the maximum.")]
+        [SerializeField] private float accelerationRangeBpm = 25f;
 
-        [Tooltip("Time (seconds) that heart rate must stay above the threshold before entering exercise mode.")]
-        [SerializeField] private float enterBufferSeconds = 3f;
+        [Header("Low Heart Rate Feedback")]
+        [Tooltip("Seconds the player can stay below the target without feedback.")]
+        [SerializeField] private float belowTargetGraceSeconds = 5f;
 
-        [Tooltip("Time (seconds) that heart rate must stay below the threshold minus hysteresis before exiting exercise mode.")]
-        [SerializeField] private float exitBufferSeconds = 5f;
+        [Tooltip("Maximum shortfall (bpm) from the target that still triggers the warning overlay after the grace period.")]
+        [SerializeField] private float belowTargetWarningBandBpm = 10f;
 
-        [Tooltip("BPM offset applied below the threshold to create hysteresis and avoid rapid toggling.")]
-        [SerializeField] private float hysteresisBpm = 5f;
+        [Tooltip("Optional UI object toggled when the player stays below the target.")]
+        [SerializeField] private GameObject lowHeartRateWarningUI;
 
-        [Header("Rate of Change & HRV Settings")]
-        [Tooltip("Delta BPM per second required to detect a burst of activity.")]
-        [SerializeField] private float slopeThresholdBpmPerSecond = 2f;
+        [Tooltip("Optional overlay object that tints the screen red when below target beyond the grace period.")]
+        [SerializeField] private GameObject redTintOverlay;
 
-        [Tooltip("Heart rate gate applied alongside low HRV to confirm high sympathetic tone.")]
-        [SerializeField] private int hrvHeartRateGate = 100;
+        [Header("Debug")]
+        [Tooltip("Resting heart rate determined from calibration. Can be set manually for testing.")]
+        [SerializeField] private float restingHeartRate = 70f;
 
-        [Tooltip("Baseline HRV in milliseconds gathered when the player is resting.")]
-        [SerializeField] private float baselineHrvMs = 120f;
+        [Tooltip("Overrides the resting heart rate when set > 0, skipping calibration.")]
+        [SerializeField] private float manualRestingHeartRate;
 
-        [Tooltip("Multiplier applied to the baseline to determine the low HRV threshold.")]
-        [SerializeField, Range(0.1f, 1f)] private float hrvDropMultiplier = 0.6f;
+        private readonly List<HeartSample> calibrationSamples = new List<HeartSample>();
+        private float calibrationTimer;
+        private bool isCalibrating;
 
-        [Tooltip("Latest HRV reading in milliseconds. This can be updated from an external sensor script.")]
-        [SerializeField] private float currentHrvMs = 120f;
-
-        private float enterTimer;
-        private float exitTimer;
-        private bool isExerciseActive;
         private float sprintToMoveRatio = 1f;
+        private float belowTargetTimer;
 
-        private int lastHeartRate;
-        private float lastHeartRateSampleTime;
-
-        public DetectionMode CurrentDetectionMode
+        private struct HeartSample
         {
-            get => detectionMode;
-            set
-            {
-                if (detectionMode != value)
-                {
-                    detectionMode = value;
-                    ResetDetectionState();
-                }
-            }
+            public float Time;
+            public int Bpm;
         }
 
-        public float ActiveMovementSpeed
+        public float RestingHeartRate => restingHeartRate;
+        public float TargetHeartRate => restingHeartRate + activationOffsetBpm;
+        public bool IsCalibrating => isCalibrating;
+
+        public float ActivationOffsetBpm
         {
-            get => activeMovementSpeed;
-            set => activeMovementSpeed = Mathf.Max(0f, value);
+            get => activationOffsetBpm;
+            set => activationOffsetBpm = Mathf.Max(0f, value);
         }
 
-        public float InactiveMovementSpeed
+        public float NormalSpeed
         {
-            get => inactiveMovementSpeed;
-            set => inactiveMovementSpeed = Mathf.Max(0f, value);
+            get => normalSpeed;
+            set => normalSpeed = Mathf.Max(0f, value);
         }
 
-        public bool LockMovementWhenInactive
+        public float MinimumSpeed
         {
-            get => lockMovementWhenInactive;
-            set => lockMovementWhenInactive = value;
+            get => minimumSpeed;
+            set => minimumSpeed = Mathf.Max(0f, value);
         }
 
-        public int PlayerAge
+        public float MaximumSpeed
         {
-            get => playerAge;
-            set => playerAge = Mathf.Max(1, value);
+            get => maximumSpeed;
+            set => maximumSpeed = Mathf.Max(0f, value);
         }
 
-        public float ActivationPercent
+        public float DecelerationRangeBpm
         {
-            get => activationPercent;
-            set => activationPercent = Mathf.Clamp01(value);
+            get => decelerationRangeBpm;
+            set => decelerationRangeBpm = Mathf.Max(0f, value);
         }
 
-        public float BaselineHrvMs
+        public float AccelerationRangeBpm
         {
-            get => baselineHrvMs;
-            set => baselineHrvMs = Mathf.Max(0f, value);
+            get => accelerationRangeBpm;
+            set => accelerationRangeBpm = Mathf.Max(0f, value);
         }
 
-        public float CurrentHrvMs
+        public float BelowTargetGraceSeconds
         {
-            get => currentHrvMs;
-            set => currentHrvMs = Mathf.Max(0f, value);
+            get => belowTargetGraceSeconds;
+            set => belowTargetGraceSeconds = Mathf.Max(0f, value);
         }
 
-        public float EnterBufferSeconds
+        public float BelowTargetWarningBandBpm
         {
-            get => enterBufferSeconds;
-            set => enterBufferSeconds = Mathf.Max(0f, value);
+            get => belowTargetWarningBandBpm;
+            set => belowTargetWarningBandBpm = Mathf.Max(0f, value);
         }
 
-        public float ExitBufferSeconds
+        public float ManualRestingHeartRate
         {
-            get => exitBufferSeconds;
-            set => exitBufferSeconds = Mathf.Max(0f, value);
+            get => manualRestingHeartRate;
+            set => manualRestingHeartRate = Mathf.Max(0f, value);
         }
 
-        public float HysteresisBpm
+        public void SetRestingHeartRate(float value)
         {
-            get => hysteresisBpm;
-            set => hysteresisBpm = Mathf.Max(0f, value);
+            restingHeartRate = Mathf.Max(0f, value);
+            isCalibrating = false;
         }
-
-        public float SlopeThresholdBpmPerSecond
-        {
-            get => slopeThresholdBpmPerSecond;
-            set => slopeThresholdBpmPerSecond = Mathf.Max(0f, value);
-        }
-
-        public int HrvHeartRateGate
-        {
-            get => hrvHeartRateGate;
-            set => hrvHeartRateGate = Mathf.Max(0, value);
-        }
-
-        public float HrvDropMultiplier
-        {
-            get => hrvDropMultiplier;
-            set => hrvDropMultiplier = Mathf.Clamp01(value);
-        }
-
-        /// <summary>
-        /// Exposes whether the controller believes the player is in an active exercise state.
-        /// </summary>
-        public bool IsExerciseActive => isExerciseActive;
 
         private void Reset()
         {
@@ -194,145 +154,168 @@ namespace LSP.Gameplay
                 firstPersonController = GetComponent<FirstPersonController>();
             }
 
-            if (firstPersonController != null)
+            if (firstPersonController != null && firstPersonController.MoveSpeed > 0f)
             {
-                sprintToMoveRatio = firstPersonController.MoveSpeed > 0f
-                    ? firstPersonController.SprintSpeed / firstPersonController.MoveSpeed
-                    : 1f;
-
-                if (Mathf.Approximately(activeMovementSpeed, 0f))
-                {
-                    activeMovementSpeed = firstPersonController.MoveSpeed;
-                }
+                sprintToMoveRatio = firstPersonController.SprintSpeed / firstPersonController.MoveSpeed;
+                normalSpeed = Mathf.Approximately(normalSpeed, 0f) ? firstPersonController.MoveSpeed : normalSpeed;
             }
 
-            ResetDetectionState();
+            if (autoStartCalibration && manualRestingHeartRate <= 0f)
+            {
+                BeginCalibration();
+            }
+            else if (manualRestingHeartRate > 0f)
+            {
+                restingHeartRate = manualRestingHeartRate;
+            }
         }
 
         private void Update()
+        {
+            int currentHeartRate = HyperateGlobal.Instance != null ? HyperateGlobal.Instance.CurrentHeartRate : 0;
+
+            if (isCalibrating)
+            {
+                UpdateCalibration(Time.deltaTime, currentHeartRate);
+            }
+
+            ApplyMovementSpeed(currentHeartRate);
+            UpdateLowHeartRateFeedback(currentHeartRate, Time.deltaTime);
+        }
+
+        public void BeginCalibration()
+        {
+            calibrationSamples.Clear();
+            calibrationTimer = 0f;
+            isCalibrating = true;
+        }
+
+        private void UpdateCalibration(float deltaTime, int currentHeartRate)
+        {
+            calibrationTimer += deltaTime;
+            float elapsedSeconds = calibrationTimer;
+
+            if (elapsedSeconds >= calibrationDurationSeconds)
+            {
+                CompleteCalibration();
+                return;
+            }
+
+            if (currentHeartRate <= 0)
+            {
+                return;
+            }
+
+            if (Mathf.FloorToInt(elapsedSeconds) > calibrationSamples.Count)
+            {
+                calibrationSamples.Add(new HeartSample { Time = elapsedSeconds, Bpm = currentHeartRate });
+            }
+        }
+
+        private void CompleteCalibration()
+        {
+            isCalibrating = false;
+
+            List<int> usableSamples = new List<int>();
+            foreach (HeartSample sample in calibrationSamples)
+            {
+                if (sample.Time >= calibrationDiscardInitialSeconds)
+                {
+                    usableSamples.Add(sample.Bpm);
+                }
+            }
+
+            if (usableSamples.Count < calibrationMinimumSamples)
+            {
+                return;
+            }
+
+            usableSamples.Sort();
+            if (usableSamples.Count > 2)
+            {
+                usableSamples.RemoveAt(0);
+                usableSamples.RemoveAt(usableSamples.Count - 1);
+            }
+
+            float sum = 0f;
+            foreach (int bpm in usableSamples)
+            {
+                sum += bpm;
+            }
+
+            restingHeartRate = sum / usableSamples.Count;
+        }
+
+        private void ApplyMovementSpeed(int currentHeartRate)
         {
             if (firstPersonController == null)
             {
                 return;
             }
 
-            HandleModeHotkeys();
-
-            int currentHeartRate = HyperateGlobal.Instance != null ? HyperateGlobal.Instance.CurrentHeartRate : 0;
-            bool newExerciseState = detectionMode switch
-            {
-                DetectionMode.RateOfChangeAndHrv => EvaluateRateOfChange(currentHeartRate),
-                _ => EvaluateMhrPercentage(currentHeartRate)
-            };
-
-            if (newExerciseState != isExerciseActive)
-            {
-                isExerciseActive = newExerciseState;
-            }
-
-            ApplyMovementSpeed();
-        }
-
-        private void HandleModeHotkeys()
-        {
-            if (!enableModeHotkeys)
-            {
-                return;
-            }
-
-            if (Input.GetKeyDown(toggleModeKey))
-            {
-                CycleDetectionMode();
-                return;
-            }
-
-            if (Input.GetKeyDown(selectMhrModeKey))
-            {
-                CurrentDetectionMode = DetectionMode.MhrPercentage;
-                return;
-            }
-
-            if (Input.GetKeyDown(selectHrvModeKey))
-            {
-                CurrentDetectionMode = DetectionMode.RateOfChangeAndHrv;
-            }
-        }
-
-        private void CycleDetectionMode()
-        {
-            CurrentDetectionMode = detectionMode == DetectionMode.MhrPercentage
-                ? DetectionMode.RateOfChangeAndHrv
-                : DetectionMode.MhrPercentage;
-        }
-
-        private void ApplyMovementSpeed()
-        {
-            float targetSpeed = isExerciseActive ? activeMovementSpeed : (lockMovementWhenInactive ? 0f : inactiveMovementSpeed);
+            float targetSpeed = CalculateSpeed(currentHeartRate);
             firstPersonController.MoveSpeed = targetSpeed;
             firstPersonController.SprintSpeed = targetSpeed * sprintToMoveRatio;
         }
 
-        public void ResetDetectionState()
+        private float CalculateSpeed(int currentHeartRate)
         {
-            enterTimer = 0f;
-            exitTimer = 0f;
-            lastHeartRate = 0;
-            lastHeartRateSampleTime = 0f;
-            isExerciseActive = false;
+            float target = TargetHeartRate;
+            float delta = currentHeartRate - target;
+
+            if (Mathf.Approximately(delta, 0f))
+            {
+                return normalSpeed;
+            }
+
+            if (delta < 0f)
+            {
+                float shortfall = Mathf.Abs(delta);
+                float t = decelerationRangeBpm > 0f ? Mathf.Min(1f, shortfall / decelerationRangeBpm) : 1f;
+                return Mathf.Lerp(normalSpeed, minimumSpeed, t);
+            }
+
+            float climb = accelerationRangeBpm > 0f ? Mathf.Min(1f, delta / accelerationRangeBpm) : 1f;
+            return Mathf.Lerp(normalSpeed, maximumSpeed, climb);
         }
 
-        private bool EvaluateMhrPercentage(int currentHeartRate)
+        private void UpdateLowHeartRateFeedback(int currentHeartRate, float deltaTime)
         {
-            int maxHeartRate = Mathf.Max(1, 220 - PlayerAge);
-            float targetValue = maxHeartRate * ActivationPercent;
+            bool belowTarget = currentHeartRate > 0 && currentHeartRate < TargetHeartRate;
 
-            if (currentHeartRate > targetValue)
+            if (belowTarget)
             {
-                enterTimer += Time.deltaTime;
-                exitTimer = 0f;
-                if (enterTimer >= enterBufferSeconds)
-                {
-                    return true;
-                }
-            }
-            else if (currentHeartRate < targetValue - hysteresisBpm)
-            {
-                exitTimer += Time.deltaTime;
-                enterTimer = 0f;
-                if (exitTimer >= exitBufferSeconds)
-                {
-                    return false;
-                }
+                belowTargetTimer += deltaTime;
             }
             else
             {
-                enterTimer = 0f;
-                exitTimer = 0f;
+                belowTargetTimer = 0f;
+                SetWarningActive(false);
+                return;
             }
 
-            return isExerciseActive;
+            if (belowTargetTimer <= belowTargetGraceSeconds)
+            {
+                SetWarningActive(false);
+                return;
+            }
+
+            float shortfall = TargetHeartRate - currentHeartRate;
+            bool withinBand = belowTargetWarningBandBpm <= 0f || shortfall <= belowTargetWarningBandBpm;
+            SetWarningActive(withinBand);
         }
 
-        private bool EvaluateRateOfChange(int currentHeartRate)
+        private void SetWarningActive(bool active)
         {
-            bool slopeTriggered = false;
-            float now = Time.time;
-
-            if (lastHeartRateSampleTime > 0f)
+            if (lowHeartRateWarningUI != null && lowHeartRateWarningUI.activeSelf != active)
             {
-                float deltaTime = Mathf.Max(Time.deltaTime, now - lastHeartRateSampleTime);
-                float slope = (currentHeartRate - lastHeartRate) / deltaTime;
-                slopeTriggered = slope > slopeThresholdBpmPerSecond;
+                lowHeartRateWarningUI.SetActive(active);
             }
 
-            lastHeartRate = currentHeartRate;
-            lastHeartRateSampleTime = now;
-
-            bool hasBaseline = baselineHrvMs > 0f && currentHrvMs > 0f;
-            bool lowHrv = hasBaseline && currentHrvMs < baselineHrvMs * hrvDropMultiplier;
-            bool sympatheticHigh = currentHeartRate > hrvHeartRateGate && lowHrv;
-
-            return slopeTriggered || sympatheticHigh;
+            if (redTintOverlay != null && redTintOverlay.activeSelf != active)
+            {
+                redTintOverlay.SetActive(active);
+            }
         }
     }
 }
