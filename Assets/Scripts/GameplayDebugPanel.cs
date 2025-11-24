@@ -22,6 +22,7 @@ namespace LSP.Gameplay
         [SerializeField] private PlayerEyeControl eyeControl;
         [SerializeField] private PlayerVision playerVision;
         [SerializeField] private Camera playerCamera;
+        [SerializeField] private HeartRateMovementController heartRateMovement;
 
         [Header("Tracked Collections")]
         [SerializeField] private List<MonsterController> trackedMonsters = new List<MonsterController>();
@@ -113,6 +114,9 @@ namespace LSP.Gameplay
 
             if (playerCamera == null)
                 playerCamera = TryResolveCamera();
+
+            if (heartRateMovement == null)
+                heartRateMovement = FindObjectOfType<HeartRateMovementController>();
 
             settingsFilePath = GameplayDebugSettingsStore.ResolvePath(settingsFileName);
             persistedSettings = GameplayDebugSettingsStore.Load(settingsFileName);
@@ -209,6 +213,8 @@ namespace LSP.Gameplay
                 persistedSettings.PlayerSpeed = newSpeed;
             }
 
+            DrawHeartRateControls();
+
             // Eye controls
             GameplayDebugSettingsData settings = persistedSettings ??= new GameplayDebugSettingsData();
 
@@ -274,6 +280,86 @@ namespace LSP.Gameplay
             if (playerVision != null)
             {
                 GUILayout.Label($"Vision Range: {playerVision.MaxDetectionDistance:F1}");
+            }
+        }
+
+        private void DrawHeartRateControls()
+        {
+            GUILayout.Space(6f);
+            GUILayout.Label("Heart Rate Movement", headerStyle);
+
+            if (heartRateMovement == null)
+            {
+                GUILayout.Label("HeartRateMovementController not assigned.");
+                return;
+            }
+
+            int currentHr = HyperateGlobal.Instance != null ? HyperateGlobal.Instance.CurrentHeartRate : 0;
+            GUILayout.Label($"Current HR: {(currentHr > 0 ? currentHr.ToString() : "N/A")} bpm");
+            GUILayout.Label($"Exercise Active: {heartRateMovement.IsExerciseActive}");
+
+            string[] modeLabels = { "方案一: MHR%", "方案二: HRV + 变化率" };
+            int selectedMode = GUILayout.Toolbar((int)heartRateMovement.CurrentDetectionMode, modeLabels);
+            if (selectedMode != (int)heartRateMovement.CurrentDetectionMode)
+            {
+                heartRateMovement.CurrentDetectionMode = (HeartRateMovementController.DetectionMode)selectedMode;
+            }
+
+            float activeSpeed = DrawSlider("Active Speed", heartRateMovement.ActiveMovementSpeed, playerSpeedMin, playerSpeedMax);
+            if (!Mathf.Approximately(activeSpeed, heartRateMovement.ActiveMovementSpeed))
+                heartRateMovement.ActiveMovementSpeed = activeSpeed;
+
+            float inactiveSpeed = DrawSlider("Inactive Speed", heartRateMovement.InactiveMovementSpeed, playerSpeedMin, playerSpeedMax);
+            if (!Mathf.Approximately(inactiveSpeed, heartRateMovement.InactiveMovementSpeed))
+                heartRateMovement.InactiveMovementSpeed = inactiveSpeed;
+
+            bool lockMovement = GUILayout.Toggle(heartRateMovement.LockMovementWhenInactive, "Lock movement when inactive");
+            if (lockMovement != heartRateMovement.LockMovementWhenInactive)
+                heartRateMovement.LockMovementWhenInactive = lockMovement;
+
+            if (heartRateMovement.CurrentDetectionMode == HeartRateMovementController.DetectionMode.MhrPercentage)
+            {
+                int newAge = Mathf.RoundToInt(DrawSlider("Player Age", heartRateMovement.PlayerAge, 10f, 80f));
+                if (newAge != heartRateMovement.PlayerAge)
+                    heartRateMovement.PlayerAge = newAge;
+
+                float newPercent = DrawSlider("MHR Threshold %", heartRateMovement.ActivationPercent, 0.1f, 1f);
+                if (!Mathf.Approximately(newPercent, heartRateMovement.ActivationPercent))
+                    heartRateMovement.ActivationPercent = newPercent;
+
+                float newEnter = DrawSlider("Enter Buffer (s)", heartRateMovement.EnterBufferSeconds, 0f, 10f);
+                if (!Mathf.Approximately(newEnter, heartRateMovement.EnterBufferSeconds))
+                    heartRateMovement.EnterBufferSeconds = newEnter;
+
+                float newExit = DrawSlider("Exit Buffer (s)", heartRateMovement.ExitBufferSeconds, 0f, 10f);
+                if (!Mathf.Approximately(newExit, heartRateMovement.ExitBufferSeconds))
+                    heartRateMovement.ExitBufferSeconds = newExit;
+
+                float newHysteresis = DrawSlider("Hysteresis (bpm)", heartRateMovement.HysteresisBpm, 0f, 15f);
+                if (!Mathf.Approximately(newHysteresis, heartRateMovement.HysteresisBpm))
+                    heartRateMovement.HysteresisBpm = newHysteresis;
+            }
+            else
+            {
+                float newSlope = DrawSlider("ΔHR Threshold (bpm/s)", heartRateMovement.SlopeThresholdBpmPerSecond, 0f, 8f);
+                if (!Mathf.Approximately(newSlope, heartRateMovement.SlopeThresholdBpmPerSecond))
+                    heartRateMovement.SlopeThresholdBpmPerSecond = newSlope;
+
+                float newGate = DrawSlider("HR Gate (bpm)", heartRateMovement.HrvHeartRateGate, 60f, 180f);
+                if (!Mathf.Approximately(newGate, heartRateMovement.HrvHeartRateGate))
+                    heartRateMovement.HrvHeartRateGate = Mathf.RoundToInt(newGate);
+
+                float newBaseline = DrawSlider("Baseline HRV (ms)", heartRateMovement.BaselineHrvMs, 10f, 300f);
+                if (!Mathf.Approximately(newBaseline, heartRateMovement.BaselineHrvMs))
+                    heartRateMovement.BaselineHrvMs = newBaseline;
+
+                float newDrop = DrawSlider("HRV Drop Multiplier", heartRateMovement.HrvDropMultiplier, 0.1f, 1f);
+                if (!Mathf.Approximately(newDrop, heartRateMovement.HrvDropMultiplier))
+                    heartRateMovement.HrvDropMultiplier = newDrop;
+
+                float newHrv = DrawSlider("Current HRV (ms)", heartRateMovement.CurrentHrvMs, 10f, 300f);
+                if (!Mathf.Approximately(newHrv, heartRateMovement.CurrentHrvMs))
+                    heartRateMovement.CurrentHrvMs = newHrv;
             }
         }
 
@@ -417,6 +503,7 @@ namespace LSP.Gameplay
             if (eyeControl == null) eyeControl = FindObjectOfType<PlayerEyeControl>();
             if (playerVision == null) playerVision = FindObjectOfType<PlayerVision>();
             if (playerCamera == null) playerCamera = TryResolveCamera();
+            if (heartRateMovement == null) heartRateMovement = FindObjectOfType<HeartRateMovementController>();
 
             AddUniqueRange(trackedMonsters, FindObjectsOfType<MonsterController>());
             AddUniqueRange(trackedNpcs, FindObjectsOfType<NpcDeadStareController>());
