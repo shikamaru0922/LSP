@@ -4,7 +4,8 @@ using UnityEngine;
 namespace LSP.Gameplay
 {
     /// <summary>
-    /// Manages the player's eye wetness resource, supporting manual blinking and forced closing.
+    /// Manages the player's eye wetness resource. The wetness UI and blink behaviour are disabled by
+    /// default per the updated design requirements.
     /// </summary>
     public class PlayerEyeControl : MonoBehaviour
     {
@@ -64,6 +65,11 @@ namespace LSP.Gameplay
         [Tooltip("Delay between warning blink sequences while the wetness remains below the threshold.")]
         [SerializeField]
         private float warningBlinkCooldown = 4f;
+
+        [Header("Runtime Overrides")]
+        [Tooltip("When enabled, the wetness resource no longer depletes and the player never blinks.")]
+        [SerializeField]
+        private bool disableWetnessAndBlinking = true;
 
         private float currentWetness;
         private float forcedBlinkTimer;
@@ -151,6 +157,12 @@ namespace LSP.Gameplay
 
         private void Update()
         {
+            if (disableWetnessAndBlinking)
+            {
+                MaintainOpenEyes();
+                return;
+            }
+
             float deltaTime = Time.deltaTime;
             UpdateBlinkTimers(deltaTime);
             HandleInput();
@@ -160,6 +172,11 @@ namespace LSP.Gameplay
 
         private void HandleInput()
         {
+            if (disableWetnessAndBlinking)
+            {
+                return;
+            }
+
             if (IsForcedClosing || IsManualBlinking)
             {
                 return;
@@ -199,6 +216,12 @@ namespace LSP.Gameplay
 
         private void UpdateWarningBlink(float deltaTime)
         {
+            if (disableWetnessAndBlinking)
+            {
+                CancelWarningBlink(false);
+                return;
+            }
+
             if (warningBlinkCooldownTimer > 0f)
             {
                 warningBlinkCooldownTimer -= deltaTime;
@@ -244,6 +267,12 @@ namespace LSP.Gameplay
 
         private void UpdateWetness(float deltaTime)
         {
+            if (disableWetnessAndBlinking)
+            {
+                currentWetness = maximumWetness;
+                return;
+            }
+
             if (EyesOpen)
             {
                 currentWetness -= dryingRate * deltaTime;
@@ -263,6 +292,11 @@ namespace LSP.Gameplay
 
         private void BeginManualBlink()
         {
+            if (disableWetnessAndBlinking)
+            {
+                return;
+            }
+
             CancelWarningBlink(false);
             warningBlinkCooldownTimer = warningBlinkCooldown;
             manualBlinkTimer = manualBlinkDuration;
@@ -280,6 +314,11 @@ namespace LSP.Gameplay
         private void BeginForcedBlink()
         {
             if (IsForcedClosing)
+            {
+                return;
+            }
+
+            if (disableWetnessAndBlinking)
             {
                 return;
             }
@@ -353,6 +392,16 @@ namespace LSP.Gameplay
             warningBlinkTimer = 0f;
             warningBlinkCooldownTimer = 0f;
             eyesOpen = true;
+        }
+
+        private void MaintainOpenEyes()
+        {
+            eyesOpen = true;
+            currentWetness = maximumWetness;
+            forcedBlinkTimer = 0f;
+            manualBlinkTimer = 0f;
+            warningBlinkTimer = 0f;
+            warningBlinkCooldownTimer = 0f;
         }
 
         private float GetWarningBlinkDuration()

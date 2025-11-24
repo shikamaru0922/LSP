@@ -51,6 +51,16 @@ namespace LSP.Gameplay
         [SerializeField]
         private float visionHoldDuration = 0.2f;
 
+        [Tooltip("Movement multiplier applied while the monster is inside the player's view.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float visionSlowMultiplier = 0.2f;
+
+        [Tooltip("Animator speed multiplier while the monster is slowed by vision.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float visionAnimatorSpeedMultiplier = 0.4f;
+
         [Header("NavMesh")]
         [SerializeField]
         private NavMeshAgent navMeshAgent;
@@ -138,6 +148,9 @@ namespace LSP.Gameplay
         private bool animatorFrozenByVision;
         private float cachedAnimatorSpeed = 1f;
         private bool cachedAnimatorEnabled = true;
+        private bool slowedByVision;
+        private bool animatorSlowedByVision;
+        private float cachedAnimatorSpeedFromVision = 1f;
         private int walkingStateHash;
         private bool walkingStateAvailable;
         private bool restartTriggered;
@@ -258,6 +271,9 @@ namespace LSP.Gameplay
                     StopNavMeshAgent();
                 }
 
+                ClearVisionSlowdown();
+                RestoreAnimatorFromVision();
+
                 ApplyAnimatorMovementState();
                 CheckForProximityRestart();
                 UpdateFootstepAudio(0f);
@@ -293,21 +309,21 @@ namespace LSP.Gameplay
             timeSinceLastSeen = inView ? 0f : timeSinceLastSeen + deltaTime;
 
             bool allowVisionControl = currentState != MonsterState.Returning || !returningIgnoresVision;
-            bool shouldHoldStationary = allowVisionControl && (inView || timeSinceLastSeen < visionHoldDuration);
+            bool shouldSlowFromVision = allowVisionControl && (inView || timeSinceLastSeen < visionHoldDuration);
 
             if (canChase && currentState == MonsterState.Stationary)
             {
                 currentState = MonsterState.Chasing;
             }
 
-            if (shouldHoldStationary)
+            if (shouldSlowFromVision)
             {
-                FreezeMoveSpeed();
-                FreezeAnimatorByVision();
+                ApplyVisionSlowdown();
+                ApplyAnimatorVisionSlowdown();
             }
             else
             {
-                RestoreMoveSpeed();
+                ClearVisionSlowdown();
                 RestoreAnimatorFromVision();
 
                 if (currentState == MonsterState.Stationary)
@@ -734,6 +750,40 @@ namespace LSP.Gameplay
             }
         }
 
+        private void ApplyVisionSlowdown()
+        {
+            if (isMoveSpeedFrozen)
+            {
+                return;
+            }
+
+            float clampedMultiplier = Mathf.Clamp01(visionSlowMultiplier);
+            ApplyMoveSpeed(desiredMoveSpeed * clampedMultiplier);
+            slowedByVision = true;
+
+            if (IsNavMeshAgentAvailable && !navMeshAgent.enabled)
+            {
+                navMeshAgent.enabled = true;
+            }
+        }
+
+        private void ClearVisionSlowdown()
+        {
+            if (!slowedByVision)
+            {
+                return;
+            }
+
+            slowedByVision = false;
+
+            if (!isMoveSpeedFrozen)
+            {
+                ApplyMoveSpeed(desiredMoveSpeed);
+            }
+
+            RestoreAnimatorSpeedFromVisionSlowdown();
+        }
+
         private void FreezeAnimatorByVision()
         {
             if (animator == null || animatorFrozenByVision)
@@ -759,7 +809,45 @@ namespace LSP.Gameplay
             animator.enabled = cachedAnimatorEnabled;
             animator.speed = cachedAnimatorSpeed;
             animatorFrozenByVision = false;
+            RestoreAnimatorSpeedFromVisionSlowdown();
             ApplyAnimatorMovementState();
+        }
+
+        private void ApplyAnimatorVisionSlowdown()
+        {
+            if (animator == null || animatorFrozenByVision)
+            {
+                return;
+            }
+
+            float clampedMultiplier = Mathf.Clamp01(visionAnimatorSpeedMultiplier);
+
+            if (animatorSlowedByVision && Mathf.Approximately(clampedMultiplier, 1f))
+            {
+                RestoreAnimatorSpeedFromVisionSlowdown();
+                return;
+            }
+
+            if (animatorSlowedByVision)
+            {
+                animator.speed = cachedAnimatorSpeedFromVision * clampedMultiplier;
+                return;
+            }
+
+            cachedAnimatorSpeedFromVision = animator.speed;
+            animator.speed = cachedAnimatorSpeedFromVision * clampedMultiplier;
+            animatorSlowedByVision = true;
+        }
+
+        private void RestoreAnimatorSpeedFromVisionSlowdown()
+        {
+            if (animator == null || animatorFrozenByVision || !animatorSlowedByVision)
+            {
+                return;
+            }
+
+            animator.speed = cachedAnimatorSpeedFromVision;
+            animatorSlowedByVision = false;
         }
 
         private void RestoreMoveSpeed()
@@ -770,6 +858,9 @@ namespace LSP.Gameplay
             }
 
             isMoveSpeedFrozen = false;
+
+            slowedByVision = false;
+            RestoreAnimatorSpeedFromVisionSlowdown();
 
             if (navAgentDisabledByVision)
             {
