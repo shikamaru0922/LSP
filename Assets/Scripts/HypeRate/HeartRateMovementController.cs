@@ -65,6 +65,13 @@ namespace LSP.Gameplay
         [Tooltip("Overrides the resting heart rate when set > 0, skipping calibration.")]
         [SerializeField] private float manualRestingHeartRate;
 
+        [Header("Simulation / Testing")]
+        [Tooltip("Always use the simulated heart rate instead of live device input.")]
+        [SerializeField] private bool forceSimulatedHeartRate;
+
+        [Tooltip("Heart rate value read when simulation is forced or no device is connected.")]
+        [SerializeField] private int simulatedHeartRate = 80;
+
         private readonly List<HeartSample> calibrationSamples = new List<HeartSample>();
         private float calibrationTimer;
         private bool isCalibrating;
@@ -172,7 +179,7 @@ namespace LSP.Gameplay
 
         private void Update()
         {
-            int currentHeartRate = HyperateGlobal.Instance != null ? HyperateGlobal.Instance.CurrentHeartRate : 0;
+            int currentHeartRate = GetCurrentHeartRate();
 
             if (isCalibrating)
             {
@@ -181,6 +188,18 @@ namespace LSP.Gameplay
 
             ApplyMovementSpeed(currentHeartRate);
             UpdateLowHeartRateFeedback(currentHeartRate, Time.deltaTime);
+        }
+
+        private int GetCurrentHeartRate()
+        {
+            bool hasLiveDevice = HyperateGlobal.Instance != null && HyperateGlobal.Instance.CurrentHeartRate > 0;
+
+            if (forceSimulatedHeartRate || !hasLiveDevice)
+            {
+                return Mathf.Max(0, simulatedHeartRate);
+            }
+
+            return HyperateGlobal.Instance.CurrentHeartRate;
         }
 
         public void BeginCalibration()
