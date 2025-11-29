@@ -1,19 +1,18 @@
 ﻿using System;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.UI; // 如果需要引用UI
+using UnityEngine.UI;
 using Newtonsoft.Json.Linq;
 using NativeWebSocket;
 using System.IO;
 
 public class HyperateGlobal : MonoBehaviour
 {
-    // 单例模式：让其他脚本方便找到我
+    // 单例模式
     public static HyperateGlobal Instance { get; private set; }
 
     [Header("默认设置")]
     public string websocketToken = "在此填入你的Token"; 
-    // deviceID 现在不写死，而是通过 UI 输入
     public string currentDeviceID = ""; 
     
     [Header("数据保存")]
@@ -24,34 +23,35 @@ public class HyperateGlobal : MonoBehaviour
     public int CurrentHeartRate { get; private set; } = 0;
     public bool IsConnected { get; private set; } = false;
 
+    // 公开文件路径，方便其他脚本读取
+    public string FullFilePath => fullFilePath;
+
     private WebSocket websocket;
     private string fullFilePath;
     private bool isLogging = false;
 
     void Awake()
     {
-        // 保证全场只有一个 HyperateGlobal
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject); // 【关键】切换场景时，我不会被销毁
-            Application.runInBackground = true; // 【关键】后台运行
+            DontDestroyOnLoad(gameObject);
+            Application.runInBackground = true;
         }
         else
         {
-            Destroy(gameObject); // 如果已经有一个我了，销毁新的这个
+            Destroy(gameObject);
         }
     }
 
     void Start()
     {
-        // 这里不自动连接，等待 LoginUI 调用 Connect()
+        // 等待 LoginUI 调用 Connect()
     }
 
-    // --- 由 UI 调用的连接函数 ---
     public async void Connect(string deviceID)
     {
-        if (IsConnected) return; // 防止重复点
+        if (IsConnected) return;
 
         currentDeviceID = deviceID;
         Debug.Log($"准备连接设备: {currentDeviceID}");
@@ -75,16 +75,13 @@ public class HyperateGlobal : MonoBehaviour
             {
                 var msg = JObject.Parse(message);
                 
-                // 收到心率更新
                 if (msg["event"] != null && msg["event"].ToString() == "hr_update")
                 {
                     string hrStr = (string)msg["payload"]["hr"];
                     int.TryParse(hrStr, out int hr);
                     
-                    // 更新核心数据
                     CurrentHeartRate = hr;
                     
-                    // 如果收到有效数据，标记为连接成功
                     if (!IsConnected && hr > 0)
                     {
                         IsConnected = true;
@@ -102,21 +99,34 @@ public class HyperateGlobal : MonoBehaviour
             IsConnected = false;
         };
 
-        await websocket.Connect();
-
-        // 3. 开启数据记录 (1Hz)
+        // 3. 先启动数据记录协程（不要放在 await 后面！）
         if (!isLogging)
         {
             StartCoroutine(LogDataRoutine());
             InvokeRepeating("SendHeartbeat", 1.0f, 20.0f);
             isLogging = true;
+            Debug.Log("<color=yellow>数据记录协程已启动</color>");
         }
+
+        await websocket.Connect();
     }
 
     void SetupFile()
     {
-        string directoryPath = Path.Combine(Application.persistentDataPath, folderName);
-        if (!Directory.Exists(directoryPath)) Directory.CreateDirectory(directoryPath);
+        // ========== 保存到桌面 ==========
+        string basePath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop);
+        
+        // 备选方案（取消注释即可使用）：
+        // 保存到"我的文档"
+        // string basePath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments);
+        
+        // 保存到项目根目录（仅编辑器有效）
+        // string basePath = Application.dataPath.Replace("/Assets", "");
+        // ================================
+
+        string directoryPath = Path.Combine(basePath, folderName);
+        if (!Directory.Exists(directoryPath)) 
+            Directory.CreateDirectory(directoryPath);
 
         string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
         fullFilePath = Path.Combine(directoryPath, $"{fileName}_{currentDeviceID}_{timestamp}.csv");
@@ -125,6 +135,9 @@ public class HyperateGlobal : MonoBehaviour
         try 
         {
             File.WriteAllText(fullFilePath, header);
+            
+            // 打印完整路径
+            Debug.Log($"<color=green>✓ 数据文件已创建: {fullFilePath}</color>");
         }
         catch (Exception e) 
         {
@@ -143,14 +156,19 @@ public class HyperateGlobal : MonoBehaviour
     {
         while (true)
         {
-            yield return new WaitForSeconds(1.0f); // 1秒记录一次
+            yield return new WaitForSeconds(1.0f);
             WriteDataToFile();
         }
     }
 
     void WriteDataToFile()
     {
-        if (string.IsNullOrEmpty(fullFilePath)) return;
+        // 调试：检查路径是否有效
+        if (string.IsNullOrEmpty(fullFilePath)) 
+        {
+            Debug.LogWarning("文件路径为空，无法写入！");
+            return;
+        }
 
         string sysTime = DateTime.Now.ToString("HH:mm:ss.fff");
         float gameTime = Time.realtimeSinceStartup;
@@ -161,8 +179,13 @@ public class HyperateGlobal : MonoBehaviour
         try
         {
             File.AppendAllText(fullFilePath, csvLine);
+            // 调试：每次写入都打印（确认工作后可以注释掉）
+            Debug.Log($"写入数据: HR={CurrentHeartRate}, 路径={fullFilePath}");
         }
-        catch {}
+        catch (Exception e)
+        {
+            Debug.LogError($"写入失败: {e.Message}");
+        }
     }
 
     async void SendJoinMessage()
