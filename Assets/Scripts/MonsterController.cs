@@ -51,15 +51,10 @@ namespace LSP.Gameplay
         [SerializeField]
         private float visionHoldDuration = 0.2f;
 
-        [Tooltip("Movement multiplier applied while the monster is inside the player's view.")]
-        [Range(0f, 1f)]
+        [Tooltip("Movement speed used while the monster is inside the player's view. Set to 0 to keep normal speed.")]
+        [Min(0f)]
         [SerializeField]
-        private float visionSlowMultiplier = 0.2f;
-
-        [Tooltip("Animator speed multiplier while the monster is slowed by vision.")]
-        [Range(0f, 1f)]
-        [SerializeField]
-        private float visionAnimatorSpeedMultiplier = 0.4f;
+        private float visionOverrideSpeed = 0f;
 
         [Header("NavMesh")]
         [SerializeField]
@@ -319,7 +314,7 @@ namespace LSP.Gameplay
             if (shouldSlowFromVision)
             {
                 ApplyVisionSlowdown();
-                ApplyAnimatorVisionSlowdown();
+                ApplyAnimatorVisionSlowdown(); // 现在这个方法已是空实现，不再改变动画速度
             }
             else
             {
@@ -757,9 +752,11 @@ namespace LSP.Gameplay
                 return;
             }
 
-            float clampedMultiplier = Mathf.Clamp01(visionSlowMultiplier);
-            ApplyMoveSpeed(desiredMoveSpeed * clampedMultiplier);
             slowedByVision = true;
+
+            // 使用固定速度，如果为 0 则保持原本的 desiredMoveSpeed
+            float targetSpeed = visionOverrideSpeed > 0f ? visionOverrideSpeed : desiredMoveSpeed;
+            ApplyMoveSpeed(targetSpeed);
 
             if (IsNavMeshAgentAvailable && !navMeshAgent.enabled)
             {
@@ -815,28 +812,8 @@ namespace LSP.Gameplay
 
         private void ApplyAnimatorVisionSlowdown()
         {
-            if (animator == null || animatorFrozenByVision)
-            {
-                return;
-            }
-
-            float clampedMultiplier = Mathf.Clamp01(visionAnimatorSpeedMultiplier);
-
-            if (animatorSlowedByVision && Mathf.Approximately(clampedMultiplier, 1f))
-            {
-                RestoreAnimatorSpeedFromVisionSlowdown();
-                return;
-            }
-
-            if (animatorSlowedByVision)
-            {
-                animator.speed = cachedAnimatorSpeedFromVision * clampedMultiplier;
-                return;
-            }
-
-            cachedAnimatorSpeedFromVision = animator.speed;
-            animator.speed = cachedAnimatorSpeedFromVision * clampedMultiplier;
-            animatorSlowedByVision = true;
+            // 视线不再改变动画速度，保持 animator.speed 不变
+            return;
         }
 
         private void RestoreAnimatorSpeedFromVisionSlowdown()
@@ -1265,6 +1242,7 @@ namespace LSP.Gameplay
             returnDistanceThreshold = Mathf.Max(0f, returnDistanceThreshold);
             walkingTransitionDuration = Mathf.Max(0f, walkingTransitionDuration);
             proximityRestartDistance = Mathf.Max(0f, proximityRestartDistance);
+            visionOverrideSpeed = Mathf.Max(0f, visionOverrideSpeed);
 
             if (animator == null)
             {
