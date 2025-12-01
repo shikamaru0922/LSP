@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using StarterAssets;
-
+using UnityEngine.UI;
 namespace LSP.Gameplay
 {
     /// <summary>
@@ -72,6 +72,21 @@ namespace LSP.Gameplay
         [Tooltip("Heart rate value read when simulation is forced or no device is connected.")]
         [SerializeField] private int simulatedHeartRate = 80;
 
+        [Header("Warning Pulse Settings")]
+        [Tooltip("呼吸闪烁的速度")]
+        [SerializeField] private float pulseSpeed = 2.0f; 
+
+        [Tooltip("最小不透明度 (0是全透明，1是完全不透明)")]
+        [Range(0f, 1f)]
+        [SerializeField] private float minAlpha = 0.2f; 
+
+        [Tooltip("最大不透明度")]
+        [Range(0f, 1f)]
+        [SerializeField] private float maxAlpha = 0.6f;
+        
+        private Image overlayImage;
+        
+        
         private readonly List<HeartSample> calibrationSamples = new List<HeartSample>();
         private float calibrationTimer;
         private bool isCalibrating;
@@ -175,6 +190,17 @@ namespace LSP.Gameplay
             {
                 restingHeartRate = manualRestingHeartRate;
             }
+            
+            // 2. 尝试获取红色遮罩上的 Image 组件
+            if (redTintOverlay != null)
+            {
+                overlayImage = redTintOverlay.GetComponent<Image>();
+                if (overlayImage == null)
+                {
+                    // 如果直接挂在子物体上，也可以尝试 GetComponentInChildren<Image>();
+                    overlayImage = redTintOverlay.GetComponentInChildren<Image>();
+                }
+            }
         }
 
         private void Update()
@@ -186,10 +212,31 @@ namespace LSP.Gameplay
                 UpdateCalibration(Time.deltaTime, currentHeartRate);
             }
 
+            
+            
             ApplyMovementSpeed(currentHeartRate);
             UpdateLowHeartRateFeedback(currentHeartRate, Time.deltaTime);
+            UpdateWarningPulse();
         }
 
+        // 新增：专门处理呼吸效果的方法
+        private void UpdateWarningPulse()
+        {
+            // 只有当红色遮罩是激活状态，且我们找到了Image组件时，才执行动画
+            if (redTintOverlay != null && redTintOverlay.activeSelf && overlayImage != null)
+            {
+                // 使用 PingPong 算法在 0 到 1 之间循环
+                // Lerp 会根据这个循环值，在 minAlpha 和 maxAlpha 之间平滑过渡
+                float t = Mathf.PingPong(Time.time * pulseSpeed, 1f);
+                float currentAlpha = Mathf.Lerp(minAlpha, maxAlpha, t);
+
+                // 获取当前颜色，修改 alpha，再赋值回去
+                Color color = overlayImage.color;
+                color.a = currentAlpha;
+                overlayImage.color = color;
+            }
+        }
+        
         private int GetCurrentHeartRate()
         {
             bool hasLiveDevice = HyperateGlobal.Instance != null && HyperateGlobal.Instance.CurrentHeartRate > 0;
@@ -326,14 +373,24 @@ namespace LSP.Gameplay
 
         private void SetWarningActive(bool active)
         {
+            // 控制文字提示 UI
             if (lowHeartRateWarningUI != null && lowHeartRateWarningUI.activeSelf != active)
             {
                 lowHeartRateWarningUI.SetActive(active);
             }
 
+            // 控制红色遮罩 UI
             if (redTintOverlay != null && redTintOverlay.activeSelf != active)
             {
                 redTintOverlay.SetActive(active);
+
+                // 可选优化：当刚激活时，重置一下颜色，防止它卡在上一次的状态
+                if (active && overlayImage != null)
+                {
+                    Color c = overlayImage.color;
+                    c.a = minAlpha; // 从最淡开始闪烁
+                    overlayImage.color = c;
+                }
             }
         }
     }
