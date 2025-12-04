@@ -151,7 +151,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10b4db5aa41bee145a34fb0d38d17e7c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gameplaySceneName: Level_Ryder
+  gameplaySceneName: Level_Ryder_HeartRate
   showCursor: 1
   unlockCursor: 1
 --- !u!4 &167874908
