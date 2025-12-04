@@ -22,6 +22,7 @@ namespace LSP.Gameplay
         [SerializeField] private PlayerEyeControl eyeControl;
         [SerializeField] private PlayerVision playerVision;
         [SerializeField] private Camera playerCamera;
+        [SerializeField] private HeartRateMovementController heartRateMovement;
 
         [Header("Tracked Collections")]
         [SerializeField] private List<MonsterController> trackedMonsters = new List<MonsterController>();
@@ -46,22 +47,6 @@ namespace LSP.Gameplay
         [SerializeField] private float perspectiveFovMax = 100f;
         [SerializeField] private float orthographicSizeMin = 1f;
         [SerializeField] private float orthographicSizeMax = 20f;
-
-        [Header("Eye Wetness Ranges")]
-        [SerializeField] private float eyeMaximumWetnessMin = 1f;
-        [SerializeField] private float eyeMaximumWetnessMax = 10f;
-
-        [SerializeField] private float eyeDryingRateMin = 0f;
-        [SerializeField] private float eyeDryingRateMax = 5f;
-
-        [SerializeField] private float eyeRecoveryRateMin = 0f;
-        [SerializeField] private float eyeRecoveryRateMax = 5f;
-
-        [SerializeField] private float eyeForcedOpenThresholdMin = 0f;
-        [SerializeField] private float eyeForcedOpenThresholdMax = 10f;
-
-        [SerializeField] private float eyeForcedCloseDurationMin = 0f;
-        [SerializeField] private float eyeForcedCloseDurationMax = 10f;
 
         [Header("Persistence")]
         [Tooltip("File name used when persisting debug-tuned values. Stored under Application.persistentDataPath.")]
@@ -113,6 +98,9 @@ namespace LSP.Gameplay
 
             if (playerCamera == null)
                 playerCamera = TryResolveCamera();
+
+            if (heartRateMovement == null)
+                heartRateMovement = FindObjectOfType<HeartRateMovementController>();
 
             settingsFilePath = GameplayDebugSettingsStore.ResolvePath(settingsFileName);
             persistedSettings = GameplayDebugSettingsStore.Load(settingsFileName);
@@ -209,72 +197,71 @@ namespace LSP.Gameplay
                 persistedSettings.PlayerSpeed = newSpeed;
             }
 
-            // Eye controls
-            GameplayDebugSettingsData settings = persistedSettings ??= new GameplayDebugSettingsData();
-
-            if (eyeControl != null)
-            {
-                GUILayout.Label($"Eyes Open: {eyeControl.EyesOpen}");
-                GUILayout.Label($"Forced Closed: {eyeControl.IsForcedClosing}");
-                GUILayout.Label($"Wetness: {eyeControl.CurrentWetness:F2} / {eyeControl.MaximumWetness:F2}");
-            }
-            else
-            {
-                GUILayout.Label("PlayerEyeControl not assigned.");
-            }
-
-            float currentMaxWetness = eyeControl != null ? eyeControl.MaximumWetness : settings.EyeMaximumWetness;
-            float newMaxWetness = DrawSlider("Max Wetness", currentMaxWetness, eyeMaximumWetnessMin, eyeMaximumWetnessMax);
-            if (!Mathf.Approximately(newMaxWetness, currentMaxWetness))
-            {
-                if (eyeControl != null) eyeControl.MaximumWetness = newMaxWetness;
-                settings.EyeMaximumWetness = newMaxWetness;
-
-                if (settings.EyeForcedOpenThreshold > newMaxWetness)
-                    settings.EyeForcedOpenThreshold = Mathf.Min(newMaxWetness, eyeForcedOpenThresholdMax);
-            }
-
-            float currentDryingRate = eyeControl != null ? eyeControl.DryingRate : settings.EyeDryingRate;
-            float newDryingRate = DrawSlider("Drying Rate", currentDryingRate, eyeDryingRateMin, eyeDryingRateMax);
-            if (!Mathf.Approximately(newDryingRate, currentDryingRate))
-            {
-                if (eyeControl != null) eyeControl.DryingRate = newDryingRate;
-                settings.EyeDryingRate = newDryingRate;
-            }
-
-            float currentRecoveryRate = eyeControl != null ? eyeControl.RecoveryRate : settings.EyeRecoveryRate;
-            float newRecoveryRate = DrawSlider("Recovery Rate", currentRecoveryRate, eyeRecoveryRateMin, eyeRecoveryRateMax);
-            if (!Mathf.Approximately(newRecoveryRate, currentRecoveryRate))
-            {
-                if (eyeControl != null) eyeControl.RecoveryRate = newRecoveryRate;
-                settings.EyeRecoveryRate = newRecoveryRate;
-            }
-
-            float forcedOpenMax = Mathf.Min(
-                eyeForcedOpenThresholdMax,
-                Mathf.Max(eyeForcedOpenThresholdMin, eyeControl != null ? eyeControl.MaximumWetness : settings.EyeMaximumWetness)
-            );
-            /*float currentForcedOpenThreshold = eyeControl != null ? eyeControl.ForcedOpenThreshold : settings.EyeForcedOpenThreshold;
-            currentForcedOpenThreshold = Mathf.Clamp(currentForcedOpenThreshold, eyeForcedOpenThresholdMin, forcedOpenMax);
-            float newForcedOpenThreshold = DrawSlider("Forced Open Threshold", currentForcedOpenThreshold, eyeForcedOpenThresholdMin, forcedOpenMax);
-            if (!Mathf.Approximately(newForcedOpenThreshold, currentForcedOpenThreshold))
-            {
-                if (eyeControl != null) eyeControl.ForcedOpenThreshold = newForcedOpenThreshold;
-                settings.EyeForcedOpenThreshold = newForcedOpenThreshold;
-            }
-
-            float currentForcedCloseDuration = eyeControl != null ? eyeControl.ForcedCloseDuration : settings.EyeForcedCloseDuration;
-            float newForcedCloseDuration = DrawSlider("Forced Close Duration", currentForcedCloseDuration, eyeForcedCloseDurationMin, eyeForcedCloseDurationMax);
-            if (!Mathf.Approximately(newForcedCloseDuration, currentForcedCloseDuration))
-            {
-                if (eyeControl != null) eyeControl.ForcedCloseDuration = newForcedCloseDuration;
-                settings.EyeForcedCloseDuration = newForcedCloseDuration;
-            }*/
+            DrawHeartRateControls();
 
             if (playerVision != null)
             {
                 GUILayout.Label($"Vision Range: {playerVision.MaxDetectionDistance:F1}");
             }
+        }
+
+        private void DrawHeartRateControls()
+        {
+            GUILayout.Space(6f);
+            GUILayout.Label("Heart Rate Movement", headerStyle);
+
+            if (heartRateMovement == null)
+            {
+                GUILayout.Label("HeartRateMovementController not assigned.");
+                return;
+            }
+
+            int currentHr = HyperateGlobal.Instance != null ? HyperateGlobal.Instance.CurrentHeartRate : 0;
+            GUILayout.Label($"Current HR: {(currentHr > 0 ? currentHr.ToString() : "N/A")} bpm");
+            GUILayout.Label($"Resting HR: {heartRateMovement.RestingHeartRate:F1} bpm → Target: {heartRateMovement.TargetHeartRate:F1} bpm");
+            GUILayout.Label($"Calibration: {(heartRateMovement.IsCalibrating ? "In Progress" : (heartRateMovement.ManualRestingHeartRate > 0f ? "Manual" : "Complete"))}");
+
+            float newManualRest = DrawSlider("Manual Resting HR", heartRateMovement.ManualRestingHeartRate, 40f, 120f);
+            if (!Mathf.Approximately(newManualRest, heartRateMovement.ManualRestingHeartRate))
+            {
+                heartRateMovement.ManualRestingHeartRate = newManualRest;
+                if (newManualRest > 0f)
+                {
+                    heartRateMovement.SetRestingHeartRate(newManualRest);
+                }
+            }
+
+            float newOffset = DrawSlider("δ offset (bpm)", heartRateMovement.ActivationOffsetBpm, 0f, 30f);
+            if (!Mathf.Approximately(newOffset, heartRateMovement.ActivationOffsetBpm))
+                heartRateMovement.ActivationOffsetBpm = newOffset;
+
+            float newNormal = DrawSlider("Vnorm", heartRateMovement.NormalSpeed, playerSpeedMin, playerSpeedMax);
+            if (!Mathf.Approximately(newNormal, heartRateMovement.NormalSpeed))
+                heartRateMovement.NormalSpeed = newNormal;
+
+            float newMin = DrawSlider("Vmin", heartRateMovement.MinimumSpeed, playerSpeedMin, playerSpeedMax);
+            if (!Mathf.Approximately(newMin, heartRateMovement.MinimumSpeed))
+                heartRateMovement.MinimumSpeed = newMin;
+
+            float newMax = DrawSlider("Vmax", heartRateMovement.MaximumSpeed, playerSpeedMin, playerSpeedMax);
+            if (!Mathf.Approximately(newMax, heartRateMovement.MaximumSpeed))
+                heartRateMovement.MaximumSpeed = newMax;
+
+            float newDecel = DrawSlider("Rdec (bpm)", heartRateMovement.DecelerationRangeBpm, 1f, 40f);
+            if (!Mathf.Approximately(newDecel, heartRateMovement.DecelerationRangeBpm))
+                heartRateMovement.DecelerationRangeBpm = newDecel;
+
+            float newAccel = DrawSlider("Racc (bpm)", heartRateMovement.AccelerationRangeBpm, 1f, 60f);
+            if (!Mathf.Approximately(newAccel, heartRateMovement.AccelerationRangeBpm))
+                heartRateMovement.AccelerationRangeBpm = newAccel;
+
+            float newGrace = DrawSlider("Below Target Grace (s)", heartRateMovement.BelowTargetGraceSeconds, 0f, 15f);
+            if (!Mathf.Approximately(newGrace, heartRateMovement.BelowTargetGraceSeconds))
+                heartRateMovement.BelowTargetGraceSeconds = newGrace;
+
+            float newBand = DrawSlider("Below Target Warning Band (bpm)", heartRateMovement.BelowTargetWarningBandBpm, 0f, 30f);
+            if (!Mathf.Approximately(newBand, heartRateMovement.BelowTargetWarningBandBpm))
+                heartRateMovement.BelowTargetWarningBandBpm = newBand;
         }
 
         private void DrawMonsterControls()
@@ -417,6 +404,7 @@ namespace LSP.Gameplay
             if (eyeControl == null) eyeControl = FindObjectOfType<PlayerEyeControl>();
             if (playerVision == null) playerVision = FindObjectOfType<PlayerVision>();
             if (playerCamera == null) playerCamera = TryResolveCamera();
+            if (heartRateMovement == null) heartRateMovement = FindObjectOfType<HeartRateMovementController>();
 
             AddUniqueRange(trackedMonsters, FindObjectsOfType<MonsterController>());
             AddUniqueRange(trackedNpcs, FindObjectsOfType<NpcDeadStareController>());

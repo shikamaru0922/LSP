@@ -17,16 +17,22 @@ public class HyperateGlobal : MonoBehaviour
     public string currentDeviceID = ""; 
     
     [Header("数据保存")]
-    public string folderName = "HeartRateData"; 
-    public string fileName = "GameSession_Log"; 
+    public string folderName = "HeartRateData";
+    public string fileName = "GameSession_Log";
+
+    [Header("路径可见 (只读)")]
+    [SerializeField] private string lastLogDirectory = string.Empty;
+    [SerializeField] private string lastLogFilePath = string.Empty;
 
     // 公开变量，供 UI 读取
     public int CurrentHeartRate { get; private set; } = 0;
     public bool IsConnected { get; private set; } = false;
 
     private WebSocket websocket;
-    private string fullFilePath;
     private bool isLogging = false;
+
+    public string LogDirectory => Path.Combine(Application.persistentDataPath, folderName);
+    public string LastLogFilePath => lastLogFilePath;
 
     void Awake()
     {
@@ -115,18 +121,20 @@ public class HyperateGlobal : MonoBehaviour
 
     void SetupFile()
     {
-        string directoryPath = Path.Combine(Application.persistentDataPath, folderName);
+        string directoryPath = LogDirectory;
         if (!Directory.Exists(directoryPath)) Directory.CreateDirectory(directoryPath);
 
         string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
-        fullFilePath = Path.Combine(directoryPath, $"{fileName}_{currentDeviceID}_{timestamp}.csv");
+        lastLogDirectory = directoryPath;
+        lastLogFilePath = Path.Combine(directoryPath, $"{fileName}_{currentDeviceID}_{timestamp}.csv");
 
         string header = "SystemTime,GameTime,HeartRate,IBI_ms\n";
-        try 
+        try
         {
-            File.WriteAllText(fullFilePath, header);
+            File.WriteAllText(lastLogFilePath, header);
+            Debug.Log($"心率日志将写入: {lastLogFilePath}");
         }
-        catch (Exception e) 
+        catch (Exception e)
         {
             Debug.LogError("文件创建失败: " + e.Message);
         }
@@ -150,7 +158,7 @@ public class HyperateGlobal : MonoBehaviour
 
     void WriteDataToFile()
     {
-        if (string.IsNullOrEmpty(fullFilePath)) return;
+        if (string.IsNullOrEmpty(lastLogFilePath)) return;
 
         string sysTime = DateTime.Now.ToString("HH:mm:ss.fff");
         float gameTime = Time.realtimeSinceStartup;
@@ -160,9 +168,24 @@ public class HyperateGlobal : MonoBehaviour
 
         try
         {
-            File.AppendAllText(fullFilePath, csvLine);
+            File.AppendAllText(lastLogFilePath, csvLine);
         }
         catch {}
+    }
+
+    public void OpenLogFolder()
+    {
+        string directoryPath = LogDirectory;
+        if (!Directory.Exists(directoryPath))
+        {
+            Directory.CreateDirectory(directoryPath);
+        }
+
+        Debug.Log($"日志目录: {directoryPath}");
+
+        #if UNITY_STANDALONE || UNITY_EDITOR
+            Application.OpenURL("file://" + directoryPath);
+        #endif
     }
 
     async void SendJoinMessage()
