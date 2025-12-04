@@ -51,11 +51,6 @@ namespace LSP.Gameplay
         [SerializeField]
         private float visionHoldDuration = 0.2f;
 
-        [Tooltip("Movement speed used while the monster is inside the player's view. Set to 0 to keep normal speed.")]
-        [Min(0f)]
-        [SerializeField]
-        private float visionOverrideSpeed = 0f;
-
         [Header("NavMesh")]
         [SerializeField]
         private NavMeshAgent navMeshAgent;
@@ -143,9 +138,6 @@ namespace LSP.Gameplay
         private bool animatorFrozenByVision;
         private float cachedAnimatorSpeed = 1f;
         private bool cachedAnimatorEnabled = true;
-        private bool slowedByVision;
-        private bool animatorSlowedByVision;
-        private float cachedAnimatorSpeedFromVision = 1f;
         private int walkingStateHash;
         private bool walkingStateAvailable;
         private bool restartTriggered;
@@ -266,9 +258,6 @@ namespace LSP.Gameplay
                     StopNavMeshAgent();
                 }
 
-                ClearVisionSlowdown();
-                RestoreAnimatorFromVision();
-
                 ApplyAnimatorMovementState();
                 CheckForProximityRestart();
                 UpdateFootstepAudio(0f);
@@ -304,21 +293,21 @@ namespace LSP.Gameplay
             timeSinceLastSeen = inView ? 0f : timeSinceLastSeen + deltaTime;
 
             bool allowVisionControl = currentState != MonsterState.Returning || !returningIgnoresVision;
-            bool shouldSlowFromVision = allowVisionControl && (inView || timeSinceLastSeen < visionHoldDuration);
+            bool shouldHoldStationary = allowVisionControl && (inView || timeSinceLastSeen < visionHoldDuration);
 
             if (canChase && currentState == MonsterState.Stationary)
             {
                 currentState = MonsterState.Chasing;
             }
 
-            if (shouldSlowFromVision)
+            if (shouldHoldStationary)
             {
-                ApplyVisionSlowdown();
-                ApplyAnimatorVisionSlowdown(); // 现在这个方法已是空实现，不再改变动画速度
+                FreezeMoveSpeed();
+                FreezeAnimatorByVision();
             }
             else
             {
-                ClearVisionSlowdown();
+                RestoreMoveSpeed();
                 RestoreAnimatorFromVision();
 
                 if (currentState == MonsterState.Stationary)
@@ -745,42 +734,6 @@ namespace LSP.Gameplay
             }
         }
 
-        private void ApplyVisionSlowdown()
-        {
-            if (isMoveSpeedFrozen)
-            {
-                return;
-            }
-
-            slowedByVision = true;
-
-            // 使用固定速度，如果为 0 则保持原本的 desiredMoveSpeed
-            float targetSpeed = visionOverrideSpeed > 0f ? visionOverrideSpeed : desiredMoveSpeed;
-            ApplyMoveSpeed(targetSpeed);
-
-            if (IsNavMeshAgentAvailable && !navMeshAgent.enabled)
-            {
-                navMeshAgent.enabled = true;
-            }
-        }
-
-        private void ClearVisionSlowdown()
-        {
-            if (!slowedByVision)
-            {
-                return;
-            }
-
-            slowedByVision = false;
-
-            if (!isMoveSpeedFrozen)
-            {
-                ApplyMoveSpeed(desiredMoveSpeed);
-            }
-
-            RestoreAnimatorSpeedFromVisionSlowdown();
-        }
-
         private void FreezeAnimatorByVision()
         {
             if (animator == null || animatorFrozenByVision)
@@ -806,25 +759,7 @@ namespace LSP.Gameplay
             animator.enabled = cachedAnimatorEnabled;
             animator.speed = cachedAnimatorSpeed;
             animatorFrozenByVision = false;
-            RestoreAnimatorSpeedFromVisionSlowdown();
             ApplyAnimatorMovementState();
-        }
-
-        private void ApplyAnimatorVisionSlowdown()
-        {
-            // 视线不再改变动画速度，保持 animator.speed 不变
-            return;
-        }
-
-        private void RestoreAnimatorSpeedFromVisionSlowdown()
-        {
-            if (animator == null || animatorFrozenByVision || !animatorSlowedByVision)
-            {
-                return;
-            }
-
-            animator.speed = cachedAnimatorSpeedFromVision;
-            animatorSlowedByVision = false;
         }
 
         private void RestoreMoveSpeed()
@@ -835,9 +770,6 @@ namespace LSP.Gameplay
             }
 
             isMoveSpeedFrozen = false;
-
-            slowedByVision = false;
-            RestoreAnimatorSpeedFromVisionSlowdown();
 
             if (navAgentDisabledByVision)
             {
@@ -1242,7 +1174,6 @@ namespace LSP.Gameplay
             returnDistanceThreshold = Mathf.Max(0f, returnDistanceThreshold);
             walkingTransitionDuration = Mathf.Max(0f, walkingTransitionDuration);
             proximityRestartDistance = Mathf.Max(0f, proximityRestartDistance);
-            visionOverrideSpeed = Mathf.Max(0f, visionOverrideSpeed);
 
             if (animator == null)
             {

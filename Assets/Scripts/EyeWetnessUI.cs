@@ -9,14 +9,11 @@ namespace LSP.Gameplay
     [DisallowMultipleComponent]
     public class EyeWetnessUI : MonoBehaviour
     {
-        [SerializeField]
-        private Slider wetnessSlider;
+        [SerializeField] private Slider wetnessSlider;
 
-        [SerializeField]
-        private PlayerEyeControl eyeControl;
+        [SerializeField] private PlayerEyeControl eyeControl;
 
-        [Tooltip("When enabled the slider displays a 0-1 normalised value instead of raw wetness.")]
-        [SerializeField]
+        [Tooltip("When enabled the slider displays a 0-1 normalised value instead of raw wetness.")] [SerializeField]
         private bool useNormalisedValue = true;
 
         private void Awake()
@@ -34,12 +31,34 @@ namespace LSP.Gameplay
 
         private void OnEnable()
         {
-            if (wetnessSlider != null)
+            UpdateSliderImmediate();
+        }
+
+        private void Update()
+        {
+            UpdateSliderImmediate();
+        }
+
+        private void UpdateSliderImmediate()
+        {
+            if (wetnessSlider == null || eyeControl == null)
             {
-                wetnessSlider.gameObject.SetActive(false);
+                return;
             }
 
-            enabled = false;
+            float maxWetness = Mathf.Max(eyeControl.MaximumWetness, Mathf.Epsilon);
+            float wetnessValue = Mathf.Clamp(eyeControl.CurrentWetness, 0f, maxWetness);
+
+            if (useNormalisedValue)
+            {
+                wetnessSlider.normalizedValue = wetnessValue / maxWetness;
+            }
+            else
+            {
+                wetnessSlider.maxValue = maxWetness;
+                wetnessSlider.value = wetnessValue;
+            }
         }
     }
 }
+        
