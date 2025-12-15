@@ -24,7 +24,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1593707965646839414}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -10.782904, y: -0.049731303, z: 2.1961858}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -60,7 +60,7 @@ Transform:
   m_GameObject: {fileID: 2242482602581165791}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.95354915, y: -0.20938131, z: -0.04}
+  m_LocalPosition: {x: 1.2883002, y: -0.17204534, z: -0.04}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -143,7 +143,7 @@ Transform:
   m_GameObject: {fileID: 2415350438582558961}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.0101949, y: -0.12392991, z: -0.04}
+  m_LocalPosition: {x: 1.2884576, y: -0.17204566, z: 0.049951933}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -224,7 +224,7 @@ Transform:
   m_GameObject: {fileID: 3486240487052702913}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -1.082749, y: 1.1407179, z: -0.00855072}
+  m_LocalPosition: {x: -1.5296198, y: 1.1407179, z: -0.00855072}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -246,7 +246,7 @@ GameObject:
   - component: {fileID: 5783091157635414054}
   - component: {fileID: 3823797607380357694}
   - component: {fileID: 9056610673954800247}
-  - component: {fileID: 4172608233381598453}
+  - component: {fileID: 1131429978909673114}
   m_Layer: 0
   m_Name: ClassRoom_Door_Frame
   m_TagString: Untagged
@@ -319,7 +319,7 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &4172608233381598453
+--- !u!64 &1131429978909673114
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -352,7 +352,7 @@ GameObject:
   - component: {fileID: 2298493121588195010}
   - component: {fileID: 4317016879877023117}
   - component: {fileID: 9124539632183281179}
-  - component: {fileID: 7541220705788071890}
+  - component: {fileID: 4801925144121458699}
   m_Layer: 0
   m_Name: ClassRoom_Door_Wood
   m_TagString: Untagged
@@ -425,7 +425,7 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &7541220705788071890
+--- !u!64 &4801925144121458699
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -508,7 +508,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: adb56eef28665cf419278ffa52d2fdd1, type: 2}
+  - {fileID: 2100000, guid: 5cb3a8077538b35478bdeee6bc8aebd7, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -557,7 +557,7 @@ Transform:
   m_GameObject: {fileID: 8257366273119956807}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.00000006978223, y: -0.123929895, z: 0.0000000016348388}
+  m_LocalPosition: {x: -0.00000006978223, y: 0.2488054, z: 0.0000000016348388}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

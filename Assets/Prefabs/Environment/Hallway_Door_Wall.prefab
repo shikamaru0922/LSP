@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 1346284874149687152}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.6047867, y: 0.1074707, z: 0.07995117}
+  m_LocalPosition: {x: -0.79761845, y: 1.7025982, z: 0.091464534}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -58,8 +58,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3091086290159782322}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -12.74937, y: 0.98351586, z: 2.107684}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -13.588293, y: -0.049999997, z: 2.107684}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -79,7 +79,7 @@ GameObject:
   - component: {fileID: 6909317189113888037}
   - component: {fileID: 4180987401480545444}
   - component: {fileID: 148925977891850513}
-  - component: {fileID: 6830917686077046920}
+  - component: {fileID: 6389515917365238549}
   m_Layer: 0
   m_Name: Hallway_Door_L
   m_TagString: Untagged
@@ -96,7 +96,7 @@ Transform:
   m_GameObject: {fileID: 3808606958494969640}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.004533247, y: -0.5267723, z: 0}
+  m_LocalPosition: {x: -0.20235948, y: -1.1409866, z: -0.011513366}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -152,7 +152,7 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &6830917686077046920
+--- !u!64 &6389515917365238549
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -201,8 +201,8 @@ Transform:
   m_GameObject: {fileID: 3992354356191728142}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.40097195, y: 0.3333682, z: -0.04}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: -0.59879816, y: -0.28084597, z: -0.051513366}
+  m_LocalScale: {x: 1.6660862, y: 1.6660862, z: 1.6660862}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8711580523607539438}
@@ -284,7 +284,7 @@ Transform:
   m_GameObject: {fileID: 4656157224627589743}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.000000573759, y: -0.123929895, z: 0}
+  m_LocalPosition: {x: 0.0000004005432, y: -0.68554157, z: -0.011513366}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -367,7 +367,7 @@ Transform:
   m_GameObject: {fileID: 8055628935239820820}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.0000007044505, y: 0.4902843, z: 0}
+  m_LocalPosition: {x: -0.0000005531311, y: -0.123929895, z: -0.011513366}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -434,7 +434,7 @@ GameObject:
   - component: {fileID: 6384725766901168715}
   - component: {fileID: 7796574029105139369}
   - component: {fileID: 9047830890005711002}
-  - component: {fileID: 3542014973091659537}
+  - component: {fileID: 1063710012142946240}
   m_Layer: 0
   m_Name: Hallway_Door_Frame
   m_TagString: Untagged
@@ -451,7 +451,7 @@ Transform:
   m_GameObject: {fileID: 8297997708908658557}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0, y: -0.033515852, z: 0.03995117}
+  m_LocalPosition: {x: -0, y: 1, z: 0.03995117}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -507,7 +507,7 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &3542014973091659537
+--- !u!64 &1063710012142946240
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -556,8 +556,8 @@ Transform:
   m_GameObject: {fileID: 8762864581722064196}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.5185056, y: -0.22294463, z: -0.04}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 0.64169425, y: -0.7637952, z: -0.051513366}
+  m_LocalScale: {x: 1.7393261, y: 1.7393261, z: 1.7393261}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8540833182032312031}
@@ -637,7 +637,7 @@ Transform:
   m_GameObject: {fileID: 8900009541040862327}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.6053927, y: -0.5067435, z: 0.07995117}
+  m_LocalPosition: {x: 0.8032189, y: 1.1409866, z: 0.091464534}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -657,7 +657,7 @@ GameObject:
   - component: {fileID: 1335694247561389578}
   - component: {fileID: 8890916562041386708}
   - component: {fileID: 647108695220164429}
-  - component: {fileID: 7577465324702445815}
+  - component: {fileID: 4315301513832327142}
   m_Layer: 0
   m_Name: Hallway_Door_R
   m_TagString: Untagged
@@ -674,7 +674,7 @@ Transform:
   m_GameObject: {fileID: 8916077622231938213}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.60392857, y: -1.1409866, z: 0}
+  m_LocalPosition: {x: 0.7967603, y: -1.7025982, z: -0.011513366}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -730,7 +730,7 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &7577465324702445815
+--- !u!64 &4315301513832327142
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
