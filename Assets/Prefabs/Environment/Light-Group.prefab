@@ -14,7 +14,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 2147483647
+  m_StaticEditorFlags: 0
   m_IsActive: 1
 --- !u!4 &5263419183366787697
 Transform:
@@ -47,11 +47,6 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: Light_Block
-      objectReference: {fileID: 0}
-    - target: {fileID: 2827175482786383154, guid: 61b16165e86215d488514d2b8604de25,
-        type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483647
       objectReference: {fileID: 0}
     - target: {fileID: 4512226054181166986, guid: 61b16165e86215d488514d2b8604de25,
         type: 3}
@@ -127,11 +122,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Light_BASE
       objectReference: {fileID: 0}
-    - target: {fileID: 7532266840186166452, guid: 5578795c4fe8cb14f88e6f1700bf182c,
-        type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483647
-      objectReference: {fileID: 0}
     - target: {fileID: 8331649168818790287, guid: 5578795c4fe8cb14f88e6f1700bf182c,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -205,11 +195,6 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: Light_Track
-      objectReference: {fileID: 0}
-    - target: {fileID: 492650440864566933, guid: 6066bb50a52a41641a05250215399108,
-        type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483647
       objectReference: {fileID: 0}
     - target: {fileID: 8778423262979654118, guid: 6066bb50a52a41641a05250215399108,
         type: 3}
@@ -334,11 +319,6 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: Light_Light
-      objectReference: {fileID: 0}
-    - target: {fileID: 6547389208054742674, guid: 92d8e040d69129844962073394100c93,
-        type: 3}
-      propertyPath: m_StaticEditorFlags
-      value: 2147483647
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
