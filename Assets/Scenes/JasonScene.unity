@@ -4613,6 +4613,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: railing
       objectReference: {fileID: 0}
+    - target: {fileID: 9214867870001268908, guid: df8530e7424443043a55286b0050bc8b,
+        type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 5e5c09de1893ec54e8fcba209cca7980, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
