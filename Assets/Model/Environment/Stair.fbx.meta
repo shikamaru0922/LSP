@@ -1,9 +1,44 @@
 fileFormatVersion: 2
-guid: 724dcaefa8fd4207914acc4526cd2c78
+guid: b9aec7079f720bf4085f0b624938cabf
 ModelImporter:
   serializedVersion: 22200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Glass_Wall_1
+    second: {fileID: 2100000, guid: c2772f14e01e767428d23de0b155c390, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Green_Metal_1
+    second: {fileID: 2100000, guid: 047950af8af8d2344a1a13de03062bc5, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Stair_Barrier_Van_1
+    second: {fileID: 2100000, guid: 74c92090882aff24c909c3870f251812, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Stair_Base_1
+    second: {fileID: 2100000, guid: 8c700426b3a504c4187d7e51959edca1, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Stair_Handle_Ground_1
+    second: {fileID: 2100000, guid: 54d7815610492374b88a1ea4a1e0bced, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Stair_Sofa_1
+    second: {fileID: 2100000, guid: 092ae68886bb5f3439d79b1a02c211aa, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Wood_Group_1
+    second: {fileID: 2100000, guid: c93eec6cfe45a004996959ae06ea4dc0, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
@@ -35,7 +70,7 @@ ModelImporter:
     isReadable: 0
   meshes:
     lODScreenPercentages: []
-    globalScale: 1
+    globalScale: 100
     meshCompression: 0
     addColliders: 0
     useSRGBMaterialColor: 1
@@ -90,7 +125,7 @@ ModelImporter:
     armStretch: 0.05
     legStretch: 0.05
     feetSpacing: 0
-    globalScale: 1
+    globalScale: 100
     rootMotionBoneName: 
     hasTranslationDoF: 0
     hasExtraRoot: 0
