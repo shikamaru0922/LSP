@@ -267,6 +267,12 @@ namespace LSP.Gameplay
             warningBlinkCooldownTimer = warningBlinkCooldown;
             manualBlinkTimer = manualBlinkDuration;
             eyesOpen = false;
+            var allBlindObjects = FindObjectsOfType<BlinkObject>();
+        
+            foreach (var obj in allBlindObjects)
+            {
+                obj.SetBlindMode(!eyesOpen);
+            }
             currentWetness = Mathf.Clamp(currentWetness + restoreWetnessPerManualBlink, 0f, maximumWetness);
             BlinkStarted?.Invoke(BlinkType.Manual, manualBlinkDuration);
         }

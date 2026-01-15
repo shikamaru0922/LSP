@@ -12,7 +12,7 @@ EditorBuildSettings:
     path: Assets/Scenes/UIScene/Start.unity
     guid: 11d2455e300ae714d916ecce9a1b263e
   - enabled: 0
-    path: Assets/Scenes/Level/Level_Ryder.unity
+    path: Assets/Scenes/Shikamaru_TestLevel/Level_Ryder.unity
     guid: 63ae3b8a723e9654e8d274f7286e5394
   - enabled: 0
     path: Assets/Scenes/UIScene/Restart.unity
