@@ -267,19 +267,26 @@ namespace LSP.Gameplay
             warningBlinkCooldownTimer = warningBlinkCooldown;
             manualBlinkTimer = manualBlinkDuration;
             eyesOpen = false;
-            var allBlindObjects = FindObjectsOfType<BlinkObject>();
-        
-            foreach (var obj in allBlindObjects)
-            {
-                obj.SetBlindMode(!eyesOpen);
-            }
+            ToggleBlindMode(!eyesOpen);
             currentWetness = Mathf.Clamp(currentWetness + restoreWetnessPerManualBlink, 0f, maximumWetness);
             BlinkStarted?.Invoke(BlinkType.Manual, manualBlinkDuration);
         }
 
+        void ToggleBlindMode(bool isClosed)
+        {
+            // 2. 找到场景里所有挂了 BlindObject 的脚本，通知它们变身
+            // (优化提示：实际项目中最好用 List 存起来，不要用 FindObjectsOfType)
+            var allBlinkObjects = FindObjectsOfType<BlinkObject>();
+        
+            foreach (var obj in allBlinkObjects)
+            {
+                obj.SetBlindMode(isClosed);
+            }
+        }
         private void EndManualBlink()
         {
             eyesOpen = !IsForcedClosing && !IsWarningBlinking;
+            ToggleBlindMode(!eyesOpen);
             BlinkEnded?.Invoke(BlinkType.Manual);
         }
 
@@ -294,6 +301,7 @@ namespace LSP.Gameplay
             warningBlinkCooldownTimer = warningBlinkCooldown;
             forcedBlinkTimer = forcedBlinkDuration;
             eyesOpen = false;
+            ToggleBlindMode(!eyesOpen);
             EyesForcedClosed?.Invoke();
             BlinkStarted?.Invoke(BlinkType.Forced, forcedBlinkDuration);
         }
@@ -303,11 +311,13 @@ namespace LSP.Gameplay
             if (!IsManualBlinking && !IsWarningBlinking)
             {
                 eyesOpen = true;
+                ToggleBlindMode(!eyesOpen);
                 BlinkEnded?.Invoke(BlinkType.Forced);
             }
             else
             {
                 eyesOpen = false;
+                ToggleBlindMode(!eyesOpen);
             }
 
             EyesForcedOpened?.Invoke();
