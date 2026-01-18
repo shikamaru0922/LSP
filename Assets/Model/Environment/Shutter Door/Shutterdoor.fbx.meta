@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: d8c99102387186a4db057a396ba8c811
+guid: c9437b082aded064f9f4296eb159d5af
 ModelImporter:
   serializedVersion: 22200
   internalIDToNameTable: []
@@ -7,43 +7,8 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Arm_cloth
-    second: {fileID: 2100000, guid: 84371b7c1e938964990c5d6d049beff8, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Arm_cut
-    second: {fileID: 2100000, guid: fd2f9e9afa52f854da2e0906d60ce422, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Body_cut
-    second: {fileID: 2100000, guid: 1f2fae7c2140c874689797f1c8664bf4, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Bodymat1
-    second: {fileID: 2100000, guid: ca71301fdb4380e4a84a789a144e3af3, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Bodymat2
-    second: {fileID: 2100000, guid: 4b9fca855ce848c4f9df5d94577c7209, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Bottommat
-    second: {fileID: 2100000, guid: bd9e601c28a3ba044828911e4cf7be45, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Shoesmat
-    second: {fileID: 2100000, guid: c6f4e9886f0421245bcb8df779fc59c3, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Topmat
-    second: {fileID: 2100000, guid: 4d349c48970e15e42b6bcfe808f12c27, type: 2}
+      name: Rolling_shutter_door1
+    second: {fileID: 2100000, guid: 9789559525678da4e9818c5928b5dc60, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
@@ -75,7 +40,7 @@ ModelImporter:
     isReadable: 0
   meshes:
     lODScreenPercentages: []
-    globalScale: 0.5
+    globalScale: 110
     meshCompression: 0
     addColliders: 0
     useSRGBMaterialColor: 1
@@ -130,7 +95,7 @@ ModelImporter:
     armStretch: 0.05
     legStretch: 0.05
     feetSpacing: 0
-    globalScale: 0.005
+    globalScale: 1.1
     rootMotionBoneName: 
     hasTranslationDoF: 0
     hasExtraRoot: 0
