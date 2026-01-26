@@ -349,10 +349,10 @@ MonoBehaviour:
   maximumWetness: 100
   dryingRate: 5
   recoveryRate: 10
-  restoreWetnessPerManualBlink: 5
+  restoreWetnessPerManualBlink: 20
   forcedBlinkDuration: 3
-  manualBlinkDuration: 1
-  manualBlinkMouseButton: 0
+  manualBlinkDuration: 0.5
+  manualBlinkKey: 32
   warningWetnessThresholdFraction: 0.25
   warningBlinkFlashCount: 3
   warningBlinkDarkenDuration: 0.7
@@ -618,6 +618,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: PlayerCapsule
+      objectReference: {fileID: 0}
+    - target: {fileID: 8616685848737228382, guid: c5efc39a8aaf6e64ea40e9ad573e9b47,
+        type: 3}
+      propertyPath: m_Height
+      value: 1.8
       objectReference: {fileID: 0}
     - target: {fileID: 8997996947095583982, guid: c5efc39a8aaf6e64ea40e9ad573e9b47,
         type: 3}
