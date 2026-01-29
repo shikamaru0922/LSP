@@ -261,7 +261,7 @@ namespace LSP.Gameplay
             currentWetness = Mathf.Clamp(currentWetness, 0f, maximumWetness);
         }
 
-        private void BeginManualBlink()
+        public void BeginManualBlink()
         {
             CancelWarningBlink(false);
             warningBlinkCooldownTimer = warningBlinkCooldown;
