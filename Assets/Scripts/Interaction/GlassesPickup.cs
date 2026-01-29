@@ -17,7 +17,7 @@ public class GlassesPickup : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space)) PickUp();
+        if (Input.GetKeyDown(KeyCode.F)) PickUp();
     }
 
     public void PickUp()
