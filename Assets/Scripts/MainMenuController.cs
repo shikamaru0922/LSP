@@ -8,6 +8,7 @@ public class MainMenuController : MonoBehaviour
 
     public void StartGame()
     {
+        Debug.Log("StartGame");
         if (!string.IsNullOrEmpty(gameplaySceneName))
         {
             SceneManager.LoadScene(gameplaySceneName);
