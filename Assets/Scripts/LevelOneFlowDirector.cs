@@ -77,6 +77,7 @@ public class LevelOneFlowDirector : MonoBehaviour
             case Stage.WaitingForLookAway1:
                 if (!isSeeingMonster)
                 {
+                    Debug.Log("1");
                     PerformTransformation();
                     currentStage = Stage.Transformation;
                 }
@@ -87,17 +88,22 @@ public class LevelOneFlowDirector : MonoBehaviour
             case Stage.WaitingForLookAway2:
                 if (!isSeeingMonster )
                 {
+                    Debug.Log("2");
                     PerformDisappearance();
                     currentStage = Stage.Disappearance;
+                    Debug.Log(isSeeingMonster);
+                    Debug.Log(isPlayerInTrapZone);
                 }
                 break;
             case Stage.Disappearance:
                 if (isSeeingMonster && isPlayerInTrapZone)
                 {
+                    Debug.Log("3");
                     if (onMonsterDisappeared != null)
                     {
                         onMonsterDisappeared.Invoke();
                     }
+                    Debug.Log("4");
                     currentStage = Stage.CountingDown;
                     StartCoroutine(CountdownToDeath());
                 }
