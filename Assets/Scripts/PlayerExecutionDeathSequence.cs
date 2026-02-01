@@ -4,44 +4,37 @@ using UnityEngine.SceneManagement;
 
 namespace LSP.Gameplay
 {
-    /// <summary>
-    /// Handles the execution animation that plays when the player dies. The referenced
-    /// execution model stays hidden until the <see cref="PlayerStateController"/> signals
-    /// a death event. Once triggered, the model is enabled, the animation is played and
-    /// the current scene (or an optional override) reloads only after the animation is
-    /// finished.
-    /// </summary>
     public class PlayerExecutionDeathSequence : MonoBehaviour
     {
         [Header("Core References")]
         [SerializeField]
         private PlayerStateController stateController;
 
-        [Tooltip("Root object for the execution model. It will be activated when the player dies.")]
+        [Tooltip("Root object for the execution model.")]
         [SerializeField]
         private GameObject executionModelRoot;
 
-        [Tooltip("Animator responsible for playing the execution animation. If left empty the first animator under the execution model will be used.")]
         [SerializeField]
         private Animator executionAnimator;
 
         [Header("Animation")]
-        [Tooltip("Name of the animator state that contains the execution animation.")]
         [SerializeField]
         private string executionStateName = "Execution";
 
-        [Tooltip("Fallback duration used if the animation length cannot be determined.")]
         [SerializeField]
         private float fallbackDuration = 3f;
 
         [Header("Scene Transition")]
-        [Tooltip("Optional scene name to load once the execution animation finishes.")]
         [SerializeField]
         private string sceneToLoad;
 
-        [Tooltip("Reload the active scene when no explicit scene name is provided.")]
         [SerializeField]
         private bool reloadCurrentSceneWhenEmpty = true;
+
+        // 【新增 1】一个明确的开关，用来禁止自动跳转
+        [Header("Control")]
+        [Tooltip("如果勾选，动画播完后【绝对不会】自动切场景。适用于需要弹UI的情况。")]
+        public bool disableAutomaticLoad = false; 
 
         private Coroutine deathRoutine;
         private bool deathCompleted;
@@ -49,91 +42,50 @@ namespace LSP.Gameplay
 
         private void Reset()
         {
-            if (stateController == null)
-            {
-                stateController = GetComponent<PlayerStateController>();
-            }
-
-            if (executionModelRoot == null)
-            {
-                executionModelRoot = transform.Find("ExecutionModel")?.gameObject;
-            }
+            if (stateController == null) stateController = GetComponent<PlayerStateController>();
+            if (executionModelRoot == null) executionModelRoot = transform.Find("ExecutionModel")?.gameObject;
         }
 
         private void Awake()
         {
-            if (stateController == null)
-            {
-                stateController = GetComponent<PlayerStateController>();
-            }
-
-            if (executionModelRoot != null && executionAnimator == null)
-            {
-                executionAnimator = executionModelRoot.GetComponentInChildren<Animator>();
-            }
-
+            if (stateController == null) stateController = GetComponent<PlayerStateController>();
+            if (executionModelRoot != null && executionAnimator == null) executionAnimator = executionModelRoot.GetComponentInChildren<Animator>();
             HideExecutionModel();
         }
 
         private void OnEnable()
         {
-            if (stateController != null)
-            {
-                stateController.PlayerKilled += HandlePlayerKilled;
-            }
+            if (stateController != null) stateController.PlayerKilled += HandlePlayerKilled;
         }
 
         private void OnDisable()
         {
-            if (stateController != null)
-            {
-                stateController.PlayerKilled -= HandlePlayerKilled;
-            }
-
-            if (deathRoutine != null)
-            {
-                StopCoroutine(deathRoutine);
-                deathRoutine = null;
-            }
-
+            if (stateController != null) stateController.PlayerKilled -= HandlePlayerKilled;
+            if (deathRoutine != null) { StopCoroutine(deathRoutine); deathRoutine = null; }
             deathCompleted = false;
             sceneToLoadOverride = null;
             HideExecutionModel();
         }
 
-        /// <summary>
-        /// Can be called from an animation event when the execution animation finishes.
-        /// </summary>
         public void NotifyExecutionAnimationFinished()
         {
-            if (!deathCompleted)
-            {
-                CompleteDeath();
-            }
+            if (!deathCompleted) CompleteDeath();
         }
 
-        /// <summary>
-        /// Overrides the scene that will be loaded when the death sequence completes.
-        /// Passing <c>null</c> or whitespace clears the override.
-        /// </summary>
         public void OverrideSceneToLoad(string sceneName)
         {
-            if (string.IsNullOrWhiteSpace(sceneName))
-            {
-                sceneToLoadOverride = null;
-                return;
-            }
-
             sceneToLoadOverride = sceneName;
+        }
+
+        // 【新增 2】提供一个方法给导演脚本调用，专门用来“踩刹车”
+        public void SuppressAutomaticSceneLoad()
+        {
+            disableAutomaticLoad = true;
         }
 
         private void HandlePlayerKilled()
         {
-            if (deathRoutine != null || deathCompleted)
-            {
-                return;
-            }
-
+            if (deathRoutine != null || deathCompleted) return;
             deathRoutine = StartCoroutine(DeathSequenceRoutine());
         }
 
@@ -142,34 +94,23 @@ namespace LSP.Gameplay
             ShowExecutionModel();
 
             if (executionAnimator == null && executionModelRoot != null)
-            {
                 executionAnimator = executionModelRoot.GetComponentInChildren<Animator>();
-            }
 
             float waitTime = Mathf.Max(0f, fallbackDuration);
 
             if (executionAnimator != null)
             {
-                if (!string.IsNullOrEmpty(executionStateName))
-                {
-                    executionAnimator.Play(executionStateName, 0, 0f);
-                }
-
-                // Wait a frame so the animator can update its current state info.
+                if (!string.IsNullOrEmpty(executionStateName)) executionAnimator.Play(executionStateName, 0, 0f);
                 yield return null;
-
                 AnimatorStateInfo stateInfo = executionAnimator.GetCurrentAnimatorStateInfo(0);
                 if (stateInfo.length > 0f)
                 {
-                    // Adjust with speed to obtain the actual playback duration.
                     float speed = Mathf.Approximately(stateInfo.speed, 0f) ? 1f : stateInfo.speed;
                     waitTime = Mathf.Max(0f, stateInfo.length / Mathf.Abs(speed));
                 }
             }
             else
             {
-                // Ensure we yield at least one frame if no animator is available so the
-                // death sequence still pauses momentarily before completing.
                 yield return null;
             }
 
@@ -180,62 +121,48 @@ namespace LSP.Gameplay
                 yield return null;
             }
 
-            if (!deathCompleted)
-            {
-                CompleteDeath();
-            }
-
+            if (!deathCompleted) CompleteDeath();
             deathRoutine = null;
         }
 
         private void CompleteDeath()
         {
-            if (deathCompleted)
+            if (deathCompleted) return;
+            deathCompleted = true;
+
+            if (deathRoutine != null) { StopCoroutine(deathRoutine); deathRoutine = null; }
+
+            // 【核心修改】如果在导演里被禁止了，或者Inspector里勾选了禁止，直接在这里停住！
+            // 这样场景就不会重载，UI 就能稳稳地停留在那里。
+            if (disableAutomaticLoad) 
             {
+                Debug.Log("PlayerExecutionDeathSequence: 自动跳转已禁用，等待玩家操作 UI。");
                 return;
             }
 
-            deathCompleted = true;
-
-            if (deathRoutine != null)
-            {
-                StopCoroutine(deathRoutine);
-                deathRoutine = null;
-            }
-
-            string targetScene = !string.IsNullOrWhiteSpace(sceneToLoadOverride)
-                ? sceneToLoadOverride
-                : sceneToLoad;
+            // 下面是原本的跳转逻辑（只有没被禁用时才执行）
+            string targetScene = !string.IsNullOrWhiteSpace(sceneToLoadOverride) ? sceneToLoadOverride : sceneToLoad;
+            
             if (string.IsNullOrWhiteSpace(targetScene) && reloadCurrentSceneWhenEmpty)
             {
                 Scene currentScene = SceneManager.GetActiveScene();
-                if (currentScene.IsValid())
-                {
-                    targetScene = currentScene.name;
-                }
+                if (currentScene.IsValid()) targetScene = currentScene.name;
             }
 
             if (!string.IsNullOrWhiteSpace(targetScene))
             {
-                sceneToLoadOverride = null;
                 SceneManager.LoadScene(targetScene);
             }
         }
 
         private void ShowExecutionModel()
         {
-            if (executionModelRoot != null)
-            {
-                executionModelRoot.SetActive(true);
-            }
+            if (executionModelRoot != null) executionModelRoot.SetActive(true);
         }
 
         private void HideExecutionModel()
         {
-            if (executionModelRoot != null)
-            {
-                executionModelRoot.SetActive(false);
-            }
+            if (executionModelRoot != null) executionModelRoot.SetActive(false);
         }
     }
 }

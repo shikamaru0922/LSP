@@ -2,8 +2,8 @@
 {
     None,
     Key_1_Triangle,      // 1号门钥匙
-    Key_2_Circle,     // 2号门钥匙
-    Key_3_Rectangle,   // 3号门钥匙
+    Key_2_Rectangle,     // 2号门钥匙
+    Key_3_Circle,   // 3号门钥匙
     
     // 第4把钥匙的组件
     Key_4_PartA,    // 子钥匙 (碎片A)
