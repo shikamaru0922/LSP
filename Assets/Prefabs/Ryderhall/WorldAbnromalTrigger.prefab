@@ -119,6 +119,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gameManager: {fileID: 0}
+  spookyObjectsToActivate: []
   playerTag: Player
-  abnormalState: 1
   triggerOnce: 1
