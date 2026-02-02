@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
@@ -8,8 +7,12 @@ namespace MuseumGame.Interaction
     public class ElectronicDoor : MonoBehaviour
     {
         [Header("Door Setup")]
-        [SerializeField] private Transform _doorPanel;  // 门板 (大的那个)
-        [SerializeField] private Transform _doorHandle; // 门把手 (小的那个，必须是门板的子物体或者独立物体)
+        [SerializeField] private Transform _doorPanel;  // 门板
+        [SerializeField] private Transform _doorHandle; // 门把手
+        
+        // 【新增】初始状态设置
+        [Tooltip("勾选后，游戏开始时门就是开着的")]
+        [SerializeField] private bool _startOpen = false; 
         
         [Header("Door Rotation (门板)")]
         [SerializeField] private float _closedAngle = 0f;
@@ -17,13 +20,9 @@ namespace MuseumGame.Interaction
         [SerializeField] private float _doorRotateSpeed = 90f;
 
         [Header("Handle Animation (门把手)")]
-        [Tooltip("把手按下去的角度 (比如局部 Z 轴转 -45 度)")]
         [SerializeField] private Vector3 _handleDownRotation = new Vector3(0, 0, -45);
-        [Tooltip("把手平时(抬起)的角度")]
         [SerializeField] private Vector3 _handleUpRotation = Vector3.zero;
-        [Tooltip("把手转动的速度")]
         [SerializeField] private float _handleTurnSpeed = 5.0f; 
-        [Tooltip("把手转到底后，等待多久门才开始动？(模拟机械延迟)")]
         [SerializeField] private float _preOpenDelay = 0.1f;
 
         [Header("Lock & Key Logic")]
@@ -32,11 +31,11 @@ namespace MuseumGame.Interaction
         
         [Header("Audio")]
         [SerializeField] private AudioSource _audioSource;
-        [SerializeField] private AudioClip _handleSound; // 把手转动的声音 (咔哒)
-        [SerializeField] private AudioClip _openSfx;     // 门轴转动的声音 (吱呀)
-        [SerializeField] private AudioClip _closeSfx;
-        [SerializeField] private AudioClip _lockedSfx;   // 拉不动的声音
-        [SerializeField] private AudioClip _unlockSfx;   // 钥匙开锁声
+        [SerializeField] private AudioClip _handleSound; // 把手转动
+        [SerializeField] private AudioClip _openSfx;     // 开门声
+        [SerializeField] private AudioClip _closeSfx;    // 关门声
+        [SerializeField] private AudioClip _lockedSfx;   // 锁住的声音
+        [SerializeField] private AudioClip _unlockSfx;   // 解锁声
 
         [Header("Events")]
         [SerializeField] private UnityEvent _onOpened;
@@ -46,7 +45,7 @@ namespace MuseumGame.Interaction
         private bool _isLocked;
         private float _currentDoorAngle;
         private float _targetDoorAngle;
-        private Coroutine _openRoutine; // 防止重复触发
+        private Coroutine _openRoutine; 
 
         public bool IsLocked => _isLocked;
         public bool IsOpen => _isOpen;
@@ -56,19 +55,34 @@ namespace MuseumGame.Interaction
             if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
             
             _isLocked = _startLocked;
-            _isOpen = false; // 默认开始是关的，除非你想支持 StartOpen
-            
-            _currentDoorAngle = _closedAngle;
-            _targetDoorAngle = _closedAngle;
+
+            // === 【核心修改】初始化状态 ===
+            if (_startOpen)
+            {
+                // 如果设置了初始开门
+                _isOpen = true;
+                _currentDoorAngle = _openAngle;
+                _targetDoorAngle = _openAngle;
+                // 注意：如果初始开门，建议把 isLocked 在 Inspector 里勾掉，或者这里强制设为 false
+                // _isLocked = false; 
+            }
+            else
+            {
+                // 默认关门状态
+                _isOpen = false;
+                _currentDoorAngle = _closedAngle;
+                _targetDoorAngle = _closedAngle;
+            }
+
+            // 应用初始角度
             UpdateDoorRotation(_currentDoorAngle);
 
-            // 初始化把手角度
             if (_doorHandle != null) _doorHandle.localRotation = Quaternion.Euler(_handleUpRotation);
         }
 
         private void Update()
         {
-            // 1. 处理门板的平滑旋转
+            // 平滑旋转处理
             if (_doorPanel != null && Mathf.Abs(_currentDoorAngle - _targetDoorAngle) > 0.1f)
             {
                 _currentDoorAngle = Mathf.MoveTowards(_currentDoorAngle, _targetDoorAngle, _doorRotateSpeed * Time.deltaTime);
@@ -76,15 +90,22 @@ namespace MuseumGame.Interaction
             }
         }
 
-        // === 交互入口 ===
+        // =========================================================
+        //  交互逻辑
+        // =========================================================
 
         public void OnHandleTriggered()
         {
-            if (_isOpen || _openRoutine != null) return; // 正在开或者已经开了，就不管
+            // 如果正在动，或者是开着的，就忽略 (或者你可以改成：如果是开着的就调用 Close())
+            if (_isOpen || _openRoutine != null) 
+            {
+                // 可选：如果你希望点击开着的门自动关门，可以在这里调用 Close();
+                return; 
+            }
 
             if (!_isLocked)
             {
-                StartCoroutine(OpenSequence()); // 没锁，直接执行开门动画序列
+                StartCoroutine(OpenSequence()); 
                 return;
             }
 
@@ -95,14 +116,11 @@ namespace MuseumGame.Interaction
 
             if (playerHasKey)
             {
-                // 解锁并开门
                 UnlockAndOpen();
             }
             else
             {
-                // 锁住了：播放拉不动的声音 + 简单的把手抖动(可选)
                 PlayClip(_lockedSfx);
-                // 这里如果想做细致，也可以加一个 StartCoroutine(ShakeHandle());
                 Debug.Log($"门锁住了，需要钥匙: {_requiredKey}");
             }
         }
@@ -112,7 +130,9 @@ namespace MuseumGame.Interaction
             _isOpen = false;
             _isLocked = true;
             _targetDoorAngle = _closedAngle;
-            _currentDoorAngle = _closedAngle;
+            _currentDoorAngle = _closedAngle; // 瞬间关上
+            // 如果不想瞬间关上，可以把上面这行删掉，只保留 _targetDoorAngle
+            
             UpdateDoorRotation(_currentDoorAngle);
             if(_doorHandle != null) _doorHandle.localRotation = Quaternion.Euler(_handleUpRotation);
             PlayClip(_lockedSfx);
@@ -123,19 +143,50 @@ namespace MuseumGame.Interaction
             _isLocked = false;
             PlayClip(_unlockSfx); 
             _onUnlockSuccess?.Invoke();
-            
-            StartCoroutine(OpenSequence()); // 紧接着执行开门序列
+            StartCoroutine(OpenSequence());
         }
 
-        // === 核心动画序列：转把手 -> 等待 -> 开门 ===
+        // =========================================================
+        //  关门逻辑
+        // =========================================================
+        public void Close()
+        {
+            if (!_isOpen || _openRoutine != null) return;
+            StartCoroutine(CloseSequence());
+        }
+
+        private IEnumerator CloseSequence()
+        {
+            _openRoutine = StartCoroutine(DoNothing());
+
+            // 设置目标为关闭角度
+            _targetDoorAngle = _closedAngle;
+
+            // 等待门转到位
+            while (Mathf.Abs(_currentDoorAngle - _closedAngle) > 0.5f)
+            {
+                yield return null;
+            }
+
+            // 撞击门框，强制归位
+            _currentDoorAngle = _closedAngle;
+            UpdateDoorRotation(_currentDoorAngle);
+            PlayClip(_closeSfx); // 播放砰的一声
+
+            _isOpen = false;
+            _openRoutine = null;
+        }
+
+        // =========================================================
+        //  开门动画序列
+        // =========================================================
         private IEnumerator OpenSequence()
         {
-            _openRoutine = StartCoroutine(DoNothing()); // 占位，防止重复调用
+            _openRoutine = StartCoroutine(DoNothing());
 
-            // 1. 播放把手声音
             PlayClip(_handleSound);
 
-            // 2. 把手向下转 (模拟按下)
+            // 转把手
             if (_doorHandle != null)
             {
                 Quaternion startRot = _doorHandle.localRotation;
@@ -149,16 +200,14 @@ namespace MuseumGame.Interaction
                 }
             }
 
-            // 3. 稍微停顿一下 (机械传动延迟)
             yield return new WaitForSeconds(_preOpenDelay);
 
-            // 4. 正式开门 (设置目标角度，Update里会自动转)
             _isOpen = true;
             _targetDoorAngle = _openAngle;
             PlayClip(_openSfx);
             _onOpened?.Invoke();
 
-            // 5. 等门稍微开一点后，把手弹回原位 (回弹)
+            // 把手回弹
             yield return new WaitForSeconds(0.5f);
             if (_doorHandle != null)
             {
@@ -167,16 +216,15 @@ namespace MuseumGame.Interaction
                 float t = 0;
                 while (t < 1f)
                 {
-                    t += Time.deltaTime * _handleTurnSpeed; // 回弹可以稍微慢点
+                    t += Time.deltaTime * _handleTurnSpeed;
                     _doorHandle.localRotation = Quaternion.Lerp(startRot, targetRot, t);
                     yield return null;
                 }
             }
 
-            _openRoutine = null; // 序列结束
+            _openRoutine = null;
         }
 
-        // 一个空的协程辅助
         IEnumerator DoNothing() { yield return null; }
 
         private void UpdateDoorRotation(float angle)
