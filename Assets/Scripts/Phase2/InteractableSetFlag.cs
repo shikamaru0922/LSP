@@ -4,67 +4,105 @@ using UnityEngine;
 
 public class InteractableSetFlag : MonoBehaviour, IInteractable
 {
+    // 定义触发类型枚举
+    public enum TriggerType
+    {
+        InteractOnly,   // 仅按键交互 (默认)
+        TouchOnly,      // 仅触碰触发 (走进触发器)
+        Both            // 按键或触碰都可以
+    }
+
+    [Header("===== 触发方式设置 =====")]
+    [Tooltip("选择这个物体是如何被触发的")]
+    public TriggerType triggerType = TriggerType.InteractOnly;
+
     [Header("===== 核心配置 =====")] 
-    [Tooltip("交互后，要把导演里的哪个布尔值设为 true？(例如: HasDirtyArm)")]
+    [Tooltip("触发后，要把导演里的哪个布尔值设为 true？(例如: HasDirtyArm)")]
     public string targetFlagName = "HasDirtyArm";
 
     [Tooltip("是否播放捡起音效？")] 
     public bool playSound = true;
     public AudioSource audioSource;
-    public AudioClip pickupSound;     // 捡起的声音
-    public AudioClip successSound;    // 成功/完成的声音 (如拆解声)
+    public AudioClip pickupSound;     
+    public AudioClip successSound;    
     
-    [Tooltip("交互成功后是否隐藏自己？(捡起物品选 true，如果是开关/机器选 false)")]
+    [Tooltip("触发成功后是否隐藏自己？(捡起物品选 true，如果是开关/触发器选 false)")]
     public bool hideOnInteract = true;
 
-    // ---------------------------------------------------------
-    //  【功能 1】前置条件检查
-    // ---------------------------------------------------------
     [Header("===== 前置条件 (可选) =====")]
-    [Tooltip("是否需要检查前置条件？(比如：必须有脏手臂才能洗)")]
+    [Tooltip("是否需要检查前置条件？")]
     public bool checkPrerequisite = false;
 
-    [Tooltip("需要检查的 Flag 名字 (例如: HasDirtyArm)")]
+    [Tooltip("需要检查的 Flag 名字")]
     public string prerequisiteFlagName;
 
-    [Tooltip("如果条件不满足(Flag是false)，播放这个拒绝音效")]
+    [Tooltip("如果条件不满足，播放这个拒绝音效")]
     public AudioClip failSound;
 
-    // ---------------------------------------------------------
-    //  【功能 2】新增：显示其他物体
-    // ---------------------------------------------------------
     [Header("===== 连带显示 (可选) =====")]
-    [Tooltip("交互成功后，要显示哪个原本隐藏的物体？(例如：拆解后显示出来的钥匙)")]
+    [Tooltip("触发成功后，要显示哪个原本隐藏的物体？")]
     public GameObject objectToShow; 
 
-    // ---------------------------------------------------------
+    // 防止重复触发的内部标记
+    private bool _hasTriggered = false;
 
+    // =========================================================
+    // 1. 玩家点击按键交互 (Interact)
+    // =========================================================
     public bool CanInteract(PlayerInteractionController caller)
     {
-        return true;
+        // 如果设置为“仅触碰”，则不显示交互提示，也不允许按键
+        if (triggerType == TriggerType.TouchOnly) return false;
+        return !_hasTriggered;
     }
 
     public void Interact(PlayerInteractionController caller)
     {
-        // 0. 检查单例是否存在
+        if (triggerType == TriggerType.TouchOnly) return;
+        
+        ExecuteLogic("按键交互");
+    }
+
+    // =========================================================
+    // 2. 玩家身体触碰交互 (Trigger Enter)
+    // =========================================================
+    private void OnTriggerEnter(Collider other)
+    {
+        // 1. 检查模式是否允许触碰
+        if (triggerType == TriggerType.InteractOnly) return;
+
+        // 2. 检查撞到的是不是玩家 (需要你的玩家物体Tag是 "Player")
+        if (other.CompareTag("Player"))
+        {
+            ExecuteLogic("触碰触发");
+        }
+    }
+
+    // =========================================================
+    // 3. 核心逻辑 (被提取出来了，公用)
+    // =========================================================
+    public void ExecuteLogic(string source)
+    {
+        if (_hasTriggered) return; // 防止一瞬间触发两次
+
+        // 0. 检查单例
         if (LevelTwoDirector.Instance == null)
         {
             Debug.LogWarning("场景里找不到 LevelTwoDirector！无法进行判定。");
             return;
         }
 
-        // =====================================================
         // 1. 前置条件判定
-        // =====================================================
         if (checkPrerequisite)
         {
             bool hasRequirement = LevelTwoDirector.Instance.GetFlag(prerequisiteFlagName);
 
             if (!hasRequirement)
             {
-                Debug.Log($"【交互失败】缺上前置条件: {prerequisiteFlagName}");
+                Debug.Log($"【{source}失败】缺上前置条件: {prerequisiteFlagName}");
 
-                if (audioSource && failSound)
+                // 只有按键交互时才播拒绝声音，不然走过去一直播声音很吵
+                if (source == "按键交互" && audioSource && failSound)
                 {
                     AudioSource.PlayClipAtPoint(failSound, transform.position);
                 }
@@ -72,34 +110,35 @@ public class InteractableSetFlag : MonoBehaviour, IInteractable
             }
         }
 
-        // =====================================================
-        // 2. 交互成功逻辑
-        // =====================================================
+        // ==================== 成功逻辑 ====================
         
-        Debug.Log($"【交互成功】设置 Flag: {targetFlagName} = True");
+        Debug.Log($"【{source}成功】设置 Flag: {targetFlagName} = True");
         
-        // A. 设置目标 Flag
+        // A. 设置 Flag
         LevelTwoDirector.Instance.SetFlagTrue(targetFlagName);
 
-        // B. 播放成功音效
-        // 优先播放 successSound，如果没有则尝试播放 pickupSound
+        // B. 播放音效
         AudioClip clipToPlay = successSound != null ? successSound : pickupSound;
         if (playSound && audioSource && clipToPlay)
         {
             AudioSource.PlayClipAtPoint(clipToPlay, transform.position);
         }
 
-        // C. 【新增】显示原本隐藏的物体
+        // C. 显示隐藏物体
         if (objectToShow != null)
         {
             objectToShow.SetActive(true);
-            Debug.Log($"【物品】已激活显示物体: {objectToShow.name}");
         }
 
-        // D. 隐藏自己 (如果是捡东西)
+        // D. 隐藏/销毁自己
         if (hideOnInteract)
         {
             gameObject.SetActive(false);
+        }
+        else
+        {
+            // 如果不隐藏，标记为已触发，防止玩家反复刷触发
+            _hasTriggered = true;
         }
     }
 }
