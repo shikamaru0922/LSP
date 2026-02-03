@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
@@ -46,7 +47,9 @@ namespace MuseumGame.Interaction
         private float _currentDoorAngle;
         private float _targetDoorAngle;
         private Coroutine _openRoutine; 
-
+        private InteractableSetFlag _interactFlagScript;
+        
+        
         public bool IsLocked => _isLocked;
         public bool IsOpen => _isOpen;
 
@@ -78,6 +81,11 @@ namespace MuseumGame.Interaction
             UpdateDoorRotation(_currentDoorAngle);
 
             if (_doorHandle != null) _doorHandle.localRotation = Quaternion.Euler(_handleUpRotation);
+        }
+
+        private void Start()
+        {
+            _interactFlagScript = GetComponent<InteractableSetFlag>();
         }
 
         private void Update()
@@ -206,6 +214,18 @@ namespace MuseumGame.Interaction
             _targetDoorAngle = _openAngle;
             PlayClip(_openSfx);
             _onOpened?.Invoke();
+            
+            if (_interactFlagScript != null)
+            {
+                // 调用它的公共方法，传入来源字符串方便调试
+                // 这会自动处理：SetFlag、播放成功音效、显示关联物体(objectToShow) 等
+                _interactFlagScript.ExecuteLogic("视线移开消失");
+            
+                // 注意：InteractableSetFlag 内部可能会隐藏物体(hideOnInteract=true)
+                // 但为了双重保险，我们检查一下，如果它没隐藏，我们这里强制隐藏
+               
+            }
+            
 
             // 把手回弹
             yield return new WaitForSeconds(0.5f);

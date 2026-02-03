@@ -1,4 +1,5 @@
 using System;
+using StarterAssets;
 using UnityEngine;
 
 namespace LSP.Gameplay
@@ -38,6 +39,8 @@ namespace LSP.Gameplay
                 return;
             }
 
+            var controller = GetComponent<FirstPersonController>();
+            if (controller != null) controller.enabled = false;
             IsAlive = false;
             PlayerKilled?.Invoke();
         }

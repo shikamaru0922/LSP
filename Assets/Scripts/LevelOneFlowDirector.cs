@@ -153,6 +153,7 @@ public class LevelOneFlowDirector : MonoBehaviour
     }
 
     // 新增的协程逻辑
+    // 新增的协程逻辑
     private IEnumerator JumpscareSequenceRoutine()
     {
         // 1. 播放 Jumpscare 音效
@@ -164,34 +165,50 @@ public class LevelOneFlowDirector : MonoBehaviour
         if (player != null)
         {
             var deathSequence = player.GetComponent<PlayerExecutionDeathSequence>();
+            
+            // 【关键】防止原本的脚本自动跳场景，必须按住它
             if (deathSequence != null)
             {
-                // 【修改】调用这个新写的方法，彻底禁止它乱跳场景
                 deathSequence.SuppressAutomaticSceneLoad(); 
             }
 
+            // 3. 触发玩家死亡动画
+            Debug.Log($"【流程】玩家死亡，开始播放动画，等待 {deathAnimationDuration} 秒...");
             player.Kill();
+            
+            // 为了防止玩家在死亡动画期间还能乱动（双重保险），可以先锁住输入
+            // var input = player.GetComponent<StarterAssetsInputs>();
+            // if (input != null) input.cursorInputForLook = false;
 
-            // 4. 【核心等待】让程序暂停几秒，等待动画播完
+            // =======================================================
+            // 4. 【核心等待】让程序暂停，等待动画播完
+            // 务必在 Inspector 面板里把 deathAnimationDuration 设置得比动画长一点点
+            // =======================================================
             yield return new WaitForSeconds(deathAnimationDuration);
 
-            // 5. 动画播完了，现在激活 UI (确保它是 Screen Space - Camera)
+            Debug.Log("【流程】动画等待结束，显示 UI");
+
+            // 5. 动画播完了，现在激活 UI
             if (endgameCanvas != null) 
             {
                 endgameCanvas.gameObject.SetActive(true);
-                //player.gameObject.SetActive(false);
                 
-                //var moveScript = player.GetComponent<MonoBehaviour>(); // 这里填你具体的移动脚本类名
-                //if (moveScript != null) moveScript.enabled = false;
-                // 6. 解锁鼠标光标 (玩家才能点击 UI 按钮)
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-                
+                // 【重要】如果你希望死亡后玩家模型还在（比如躺在地上），不要 SetActive(false)
+                // 但如果你希望只留下 UI，可以隐藏玩家。建议不要隐藏，否则摄像机可能会黑屏。
+                // player.gameObject.SetActive(false); 
+
+                // 6. 彻底解锁鼠标光标 (确保玩家能看见鼠标并点击 UI 按钮)
+                Cursor.lockState = CursorLockMode.None; // 解除锁定
+                Cursor.visible = true;                  // 显示鼠标
+            }
+            else
+            {
+                Debug.LogError("【错误】Endgame Canvas 未赋值，UI 无法显示！");
             }
         }
         else
         {
-            Debug.LogError("【错误】导演找不到玩家！");
+            Debug.LogError("【错误】导演找不到 PlayerStateController，无法执行死亡流程！");
         }
     }
 }

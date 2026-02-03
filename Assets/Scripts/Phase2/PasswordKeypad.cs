@@ -28,8 +28,11 @@ public class PasswordKeypad : MonoBehaviour
 
     private bool isSolved = false;
 
+    private InteractableSetFlag _interactFlagScript;
     void Start()
     {
+        _interactFlagScript = GetComponent<InteractableSetFlag>();
+        
         // 游戏开始时隐藏密码锁
         if(uiPanel != null) uiPanel.SetActive(false);
         
@@ -88,6 +91,18 @@ public class PasswordKeypad : MonoBehaviour
 
             // 延迟一点关闭UI，让玩家看到成功提示
             Invoke("CloseKeypad", 1.0f);
+            
+            if (_interactFlagScript != null)
+            {
+                // 调用它的公共方法，传入来源字符串方便调试
+                // 这会自动处理：SetFlag、播放成功音效、显示关联物体(objectToShow) 等
+                _interactFlagScript.ExecuteLogic("视线移开消失");
+            
+                // 注意：InteractableSetFlag 内部可能会隐藏物体(hideOnInteract=true)
+                // 但为了双重保险，我们检查一下，如果它没隐藏，我们这里强制隐藏
+               
+            }
+            
         }
         else
         {
