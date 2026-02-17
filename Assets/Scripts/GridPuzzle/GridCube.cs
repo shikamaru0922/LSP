@@ -11,20 +11,32 @@ namespace LSP.Puzzles
     [RequireComponent(typeof(Collider))]
     public class GridCube : MonoBehaviour
     {
-        private static readonly int BaseColorProperty = Shader.PropertyToID("_BaseColor");
-        private static readonly int ColorProperty = Shader.PropertyToID("_Color");
+        private static readonly int EmissionColorProperty = Shader.PropertyToID("_EmissionColor");
 
         [SerializeField]
         [Tooltip("Renderer used to display the cube's current color. Defaults to the first Renderer found on the object or its children.")]
         private Renderer targetRenderer;
 
+        [Header("Emission Colors")]
         [SerializeField]
-        [Tooltip("Color used when the cube is inactive (white state).")]
-        private Color inactiveColor = Color.white;
+        [ColorUsage(false, true)]
+        [Tooltip("Emission when inactive and not hovered (Dim Warm Yellow).")]
+        private Color idleEmissionColor = new Color(1f, 0.6f, 0.2f, 1f) * 0.5f; // Dim warm yellow
 
         [SerializeField]
-        [Tooltip("Color used when the cube is active (green state).")]
-        private Color activeColor = Color.green;
+        [ColorUsage(false, true)]
+        [Tooltip("Emission when hovered but inactive (Weak Blue).")]
+        private Color hoverEmissionColor = new Color(0.2f, 0.4f, 1f, 1f) * 1.5f; // Weak blue
+
+        [SerializeField]
+        [ColorUsage(false, true)]
+        [Tooltip("Emission when active (Strong Blue).")]
+        private Color activeEmissionColor = new Color(0f, 0.4f, 1f, 1f) * 3.5f; // Strong blue
+
+        [SerializeField]
+        [ColorUsage(false, true)]
+        [Tooltip("Emission when the puzzle is solved (Bright Green).")]
+        private Color solvedEmissionColor = new Color(0f, 1f, 0f, 1f) * 3f; // Bright green
 
         [Header("Feedback Settings")]
         [SerializeField]
@@ -56,13 +68,14 @@ namespace LSP.Puzzles
         private MaterialPropertyBlock propertyBlock;
         private GridPuzzleManager owner;
         private bool isActive;
+        private bool isSolved;
         private Vector3 initialScale;
         private Tween hoverTween;
         private Tween clickTween;
         private bool isHovered;
 
         /// <summary>
-        /// Current cube state. True when the cube is green (active).
+        /// Current cube state. True when the cube is active.
         /// </summary>
         public bool IsActive => isActive;
 
@@ -80,7 +93,7 @@ namespace LSP.Puzzles
 
             propertyBlock = new MaterialPropertyBlock();
             initialScale = transform.localScale;
-            ApplyColor();
+            UpdateVisuals();
         }
 
         /// <summary>
@@ -90,7 +103,7 @@ namespace LSP.Puzzles
         {
             owner = puzzleManager;
             isActive = startActive;
-            ApplyColor();
+            UpdateVisuals();
         }
 
         /// <summary>
@@ -121,7 +134,7 @@ namespace LSP.Puzzles
         public void Toggle()
         {
             isActive = !isActive;
-            ApplyColor();
+            UpdateVisuals();
         }
 
         /// <summary>
@@ -130,11 +143,21 @@ namespace LSP.Puzzles
         public void SetState(bool active)
         {
             isActive = active;
-            ApplyColor();
+            UpdateVisuals();
+        }
+
+        /// <summary>
+        /// Set the solved state of the cube.
+        /// </summary>
+        public void SetSolved(bool solved)
+        {
+            isSolved = solved;
+            UpdateVisuals();
         }
 
         private void OnMouseDown()
         {
+            if (isSolved) return; // Prevent interaction when solved? User didn't specify, but usually good practice.
             PlayClickFeedback();
             owner?.HandleCubeActivated(this);
         }
@@ -143,12 +166,14 @@ namespace LSP.Puzzles
         {
             isHovered = true;
             PlayHoverFeedback();
+            UpdateVisuals();
         }
 
         private void OnMouseExit()
         {
             isHovered = false;
             ResetHoverFeedback();
+            UpdateVisuals();
         }
 
         private void OnDisable()
@@ -159,14 +184,32 @@ namespace LSP.Puzzles
             isHovered = false;
         }
 
-        private void ApplyColor()
+        private void UpdateVisuals()
         {
             if (targetRenderer == null)
             {
                 return;
             }
 
-            var targetColour = isActive ? activeColor : inactiveColor;
+            // Priority: Solved > Active > Hover > Idle
+            Color targetEmission;
+
+            if (isSolved)
+            {
+                targetEmission = solvedEmissionColor;
+            }
+            else if (isActive)
+            {
+                targetEmission = activeEmissionColor;
+            }
+            else if (isHovered)
+            {
+                targetEmission = hoverEmissionColor;
+            }
+            else
+            {
+                targetEmission = idleEmissionColor;
+            }
 
             if (propertyBlock == null)
             {
@@ -174,33 +217,8 @@ namespace LSP.Puzzles
             }
 
             targetRenderer.GetPropertyBlock(propertyBlock);
-
-            var material = targetRenderer.sharedMaterial;
-            var appliedThroughPropertyBlock = false;
-
-            if (material != null)
-            {
-                if (material.HasProperty(BaseColorProperty))
-                {
-                    propertyBlock.SetColor(BaseColorProperty, targetColour);
-                    appliedThroughPropertyBlock = true;
-                }
-                else if (material.HasProperty(ColorProperty))
-                {
-                    propertyBlock.SetColor(ColorProperty, targetColour);
-                    appliedThroughPropertyBlock = true;
-                }
-            }
-
-            if (appliedThroughPropertyBlock)
-            {
-                targetRenderer.SetPropertyBlock(propertyBlock);
-            }
-            else
-            {
-                // Fallback for custom shaders without colour properties supported by MaterialPropertyBlock.
-                targetRenderer.material.color = targetColour;
-            }
+            propertyBlock.SetColor(EmissionColorProperty, targetEmission);
+            targetRenderer.SetPropertyBlock(propertyBlock);
         }
 
         private void PlayHoverFeedback()

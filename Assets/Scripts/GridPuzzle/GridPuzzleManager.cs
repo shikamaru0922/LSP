@@ -4,6 +4,13 @@ using UnityEngine.Events;
 
 namespace LSP.Puzzles
 {
+    public enum GridOrientation
+    {
+        XY,
+        XZ,
+        YZ
+    }
+
     /// <summary>
     /// Creates and manages a grid of <see cref="GridCube"/> instances that implement
     /// the colour flipping puzzle described in the game design.
@@ -11,6 +18,10 @@ namespace LSP.Puzzles
     public class GridPuzzleManager : MonoBehaviour
     {
         [Header("Layout")]
+        [SerializeField]
+        [Tooltip("The plane in which to generate the grid.")]
+        private GridOrientation gridOrientation = GridOrientation.XY;
+
         [SerializeField]
         [Tooltip("Prefab used for each cube cell. Must contain a Collider component.")]
         private GridCube cubePrefab;
@@ -26,6 +37,14 @@ namespace LSP.Puzzles
         [SerializeField]
         [Tooltip("If true, generates the puzzle grid automatically during Start().")]
         private bool generateOnStart = true;
+
+        [SerializeField]
+        [Tooltip("Optional transform to define the origin and orientation of the grid. If null, uses this object's transform.")]
+        private Transform gridOrigin;
+
+        [SerializeField]
+        [Tooltip("Additional local rotation to apply to each button.")]
+        private Vector3 buttonRotationOffset;
 
         [Header("Gameplay")]
         [SerializeField]
@@ -81,12 +100,32 @@ namespace LSP.Puzzles
             var size = GridSize;
             gridCubes = new GridCube[size.x, size.y];
 
+            var origin = gridOrigin != null ? gridOrigin : transform;
+            var baseRotation = origin.rotation * Quaternion.Euler(buttonRotationOffset);
+
             for (var x = 0; x < size.x; x++)
             {
                 for (var y = 0; y < size.y; y++)
                 {
-                    var worldPosition = transform.TransformPoint(new Vector3(x * spacing, 0f, y * spacing));
-                    var cubeInstance = Instantiate(cubePrefab, worldPosition, transform.rotation, transform);
+                    Vector3 localPos = Vector3.zero;
+                    switch (gridOrientation)
+                    {
+                        case GridOrientation.XY:
+                            // Right (X), Down (-Y)
+                            localPos = new Vector3(x * spacing, -y * spacing, 0f);
+                            break;
+                        case GridOrientation.XZ:
+                            // Right (X), Forward (Z)
+                            localPos = new Vector3(x * spacing, 0f, y * spacing);
+                            break;
+                        case GridOrientation.YZ:
+                            // Forward (Z), Down (-Y)
+                            localPos = new Vector3(0f, -y * spacing, x * spacing);
+                            break;
+                    }
+
+                    var worldPosition = origin.TransformPoint(localPos);
+                    var cubeInstance = Instantiate(cubePrefab, worldPosition, baseRotation, transform);
                     cubeInstance.Initialise(this, startActive);
                     gridCubes[x, y] = cubeInstance;
                 }
@@ -204,8 +243,9 @@ namespace LSP.Puzzles
                         continue;
                     }
 
-                    var up = y + 1 < height ? gridCubes[x, y + 1] : null;
-                    var down = y - 1 >= 0 ? gridCubes[x, y - 1] : null;
+                    // Grid is generated downwards (negative Y), so 'Up' (positive Y) is y-1, and 'Down' (negative Y) is y+1
+                    var up = y - 1 >= 0 ? gridCubes[x, y - 1] : null;
+                    var down = y + 1 < height ? gridCubes[x, y + 1] : null;
                     var left = x - 1 >= 0 ? gridCubes[x - 1, y] : null;
                     var right = x + 1 < width ? gridCubes[x + 1, y] : null;
                     cube.SetNeighbours(up, down, left, right);
@@ -216,6 +256,13 @@ namespace LSP.Puzzles
         private void EvaluateSolvedState()
         {
             var solved = IsSolved();
+            
+            // Update visual state of all cubes
+            foreach (var cube in AllCubes())
+            {
+                cube.SetSolved(solved);
+            }
+
             if (solved)
             {
                 if (!hasReportedSolved)
