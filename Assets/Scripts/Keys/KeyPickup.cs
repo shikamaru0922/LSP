@@ -47,7 +47,7 @@ namespace LSP.Gameplay
             }
 
             // 3. 销毁物体 (捡起来了)
-            Destroy(gameObject);
+            Destroy(gameObject, 0.3f);
             
             Debug.Log($"[KeyPickup] 玩家捡起了钥匙: {_keyType}");
         }
