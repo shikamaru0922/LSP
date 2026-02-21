@@ -4,9 +4,9 @@ using UnityEngine;
 namespace LSP.Gameplay
 {
     /// <summary>
-    /// 按列表顺序逐个激活怪物。
-    /// 规则：同一时间只允许一个怪物激活；当前怪物失活/销毁后才会尝试激活下一个；
-    /// 且激活时必须保证怪物不在玩家视野内。
+    /// 按列表顺序逐个启用怪物控制脚本。
+    /// 规则：同一时间只允许一个怪物控制器启用；当前怪物死亡/销毁/控制器失效后，才会尝试下一个；
+    /// 且启用时必须保证怪物不在玩家视野内。
     /// </summary>
     public class MonsterSequentialActivator : MonoBehaviour
     {
@@ -14,7 +14,7 @@ namespace LSP.Gameplay
         [SerializeField]
         private PlayerVision playerVision;
 
-        [Tooltip("按顺序填写要激活的怪物。")]
+        [Tooltip("按顺序填写要激活的怪物控制器。")]
         [SerializeField]
         private List<MonsterController> monsterQueue = new List<MonsterController>();
 
@@ -23,13 +23,13 @@ namespace LSP.Gameplay
         [SerializeField]
         private bool autoStartOnEnable = true;
 
-        [Tooltip("是否在启动序列时隐藏队列中的所有怪物。默认关闭：只启动脚本，不隐藏怪物。")]
+        [Tooltip("开始序列时是否先禁用队列中全部怪物控制器（只禁用脚本，不隐藏怪物）。")]
         [SerializeField]
-        private bool deactivateAllOnStart;
+        private bool disableAllControllersOnStart = true;
 
         [Tooltip("当队列为空时是否自动查找场景中的怪物作为队列。")]
         [SerializeField]
-        private bool autoFillQueueIfEmpty = false;
+        private bool autoFillQueueIfEmpty;
 
         [Tooltip("是否输出调试日志。")]
         [SerializeField]
@@ -66,9 +66,6 @@ namespace LSP.Gameplay
             activeMonster = null;
         }
 
-        /// <summary>
-        /// 开始（或重开）怪物顺序激活流程。
-        /// </summary>
         [ContextMenu("Start Monster Sequence")]
         public void StartSequence()
         {
@@ -76,16 +73,14 @@ namespace LSP.Gameplay
             activeMonster = null;
             hasStarted = true;
 
-            if (deactivateAllOnStart)
+            if (disableAllControllersOnStart)
             {
-                DeactivateAllQueuedMonsters();
+                DisableAllControllers();
             }
-            else
+            else if (TryUseAlreadyEnabledMonster())
             {
-                if (TryUseAlreadyActiveMonster())
-                {
-                    return;
-                }
+                DisableOtherControllers(activeMonster);
+                return;
             }
 
             TryActivateNextMonster();
@@ -98,7 +93,7 @@ namespace LSP.Gameplay
                 return;
             }
 
-            if (activeMonster != null && activeMonster.gameObject.activeInHierarchy)
+            if (IsCurrentMonsterValidAndRunning())
             {
                 return;
             }
@@ -107,18 +102,11 @@ namespace LSP.Gameplay
             TryActivateNextMonster();
         }
 
-        private void DeactivateAllQueuedMonsters()
+        private bool IsCurrentMonsterValidAndRunning()
         {
-            for (int i = 0; i < monsterQueue.Count; i++)
-            {
-                MonsterController monster = monsterQueue[i];
-                if (monster == null)
-                {
-                    continue;
-                }
-
-                monster.gameObject.SetActive(false);
-            }
+            return activeMonster != null &&
+                   activeMonster.gameObject.activeInHierarchy &&
+                   activeMonster.enabled;
         }
 
         private void TryActivateNextMonster()
@@ -136,27 +124,40 @@ namespace LSP.Gameplay
                 return;
             }
 
+            if (!nextMonster.gameObject.activeInHierarchy)
+            {
+                if (verboseLog)
+                {
+                    Debug.Log($"[MonsterSequentialActivator] 跳过未激活对象：{nextMonster.name}", this);
+                }
+
+                nextMonsterIndex++;
+                TryActivateNextMonster();
+                return;
+            }
+
             if (IsVisibleToPlayer(nextMonster))
             {
                 if (verboseLog)
                 {
-                    Debug.Log($"[MonsterSequentialActivator] 等待激活：{nextMonster.name}（仍在玩家视野内）", this);
+                    Debug.Log($"[MonsterSequentialActivator] 等待启用控制器：{nextMonster.name}（仍在玩家视野内）", this);
                 }
 
                 return;
             }
 
-            nextMonster.gameObject.SetActive(true);
+            nextMonster.enabled = true;
             activeMonster = nextMonster;
             nextMonsterIndex++;
+            DisableOtherControllers(activeMonster);
 
             if (verboseLog)
             {
-                Debug.Log($"[MonsterSequentialActivator] 激活怪物：{nextMonster.name}", this);
+                Debug.Log($"[MonsterSequentialActivator] 启用怪物控制器：{nextMonster.name}", this);
             }
         }
 
-        private bool TryUseAlreadyActiveMonster()
+        private void DisableAllControllers()
         {
             for (int i = 0; i < monsterQueue.Count; i++)
             {
@@ -166,7 +167,35 @@ namespace LSP.Gameplay
                     continue;
                 }
 
-                if (!monster.gameObject.activeInHierarchy)
+                monster.enabled = false;
+            }
+        }
+
+        private void DisableOtherControllers(MonsterController current)
+        {
+            for (int i = 0; i < monsterQueue.Count; i++)
+            {
+                MonsterController monster = monsterQueue[i];
+                if (monster == null || monster == current)
+                {
+                    continue;
+                }
+
+                monster.enabled = false;
+            }
+        }
+
+        private bool TryUseAlreadyEnabledMonster()
+        {
+            for (int i = 0; i < monsterQueue.Count; i++)
+            {
+                MonsterController monster = monsterQueue[i];
+                if (monster == null)
+                {
+                    continue;
+                }
+
+                if (!monster.gameObject.activeInHierarchy || !monster.enabled)
                 {
                     continue;
                 }
@@ -176,7 +205,7 @@ namespace LSP.Gameplay
 
                 if (verboseLog)
                 {
-                    Debug.Log($"[MonsterSequentialActivator] 继续使用当前已激活怪物：{monster.name}", this);
+                    Debug.Log($"[MonsterSequentialActivator] 继续使用当前已启用控制器：{monster.name}", this);
                 }
 
                 return true;
