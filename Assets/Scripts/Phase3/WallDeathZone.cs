@@ -17,20 +17,59 @@ namespace LSP.Gameplay
         [Tooltip("被墙壁碾碎的普通雕像的 Tag")]
         public string targetTag = "Statue"; // 或者是 "Enemy"，看你的项目设置
 
+        [Tooltip("可选：怪物对象身上的脚本。若命中子 Collider 也能识别并销毁整只怪物。")]
+        [SerializeField] private bool destroyMonsterControllerOwner = true;
+
+        private Collider zoneCollider;
+
+        private void Awake()
+        {
+            zoneCollider = GetComponent<Collider>();
+            if (!zoneCollider.isTrigger)
+            {
+                Debug.LogWarning("【WallDeathZone】当前 Collider 不是 Trigger。若希望使用 OnTriggerEnter，请勾选 Is Trigger。", this);
+            }
+        }
+
         private void OnTriggerEnter(Collider other)
         {
-            Debug.Log($"【WallDeathZone】墙壁碾碎了边缘的雕像: {other.name}");
-            // 1. 碰到玩家 -> 触发你配好的 Event System 死亡事件
-            if (other.CompareTag("Player"))
+            HandleContact(other);
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            HandleContact(collision.collider);
+        }
+
+        private void HandleContact(Collider other)
+        {
+            if (other == null)
             {
-                Debug.Log("【WallDeathZone】玩家被墙壁挤死了！触发死亡事件。");
-                onPlayerCrushed?.Invoke();
+                return;
             }
-            // 2. 碰到雕像/怪物 -> 方案A：冷酷清场，直接销毁！
-            else if (other.CompareTag(targetTag))
+
+            // 1. 玩家
+            if (other.CompareTag("Player") || other.transform.root.CompareTag("Player"))
             {
-                Debug.Log($"【WallDeathZone】墙壁碾碎了边缘的雕像: {other.name}");
-                Destroy(other.gameObject);
+                Debug.Log("【WallDeathZone】玩家被墙壁挤死了！触发死亡事件。", other);
+                onPlayerCrushed?.Invoke();
+                return;
+            }
+
+            // 2. 按标签清场（支持标签挂在父物体）
+            if (other.CompareTag(targetTag) || other.transform.root.CompareTag(targetTag))
+            {
+                GameObject victim = other.CompareTag(targetTag) ? other.gameObject : other.transform.root.gameObject;
+                Debug.Log($"【WallDeathZone】墙壁碾碎目标: {victim.name}", victim);
+                Destroy(victim);
+                return;
+            }
+
+            // 3. 可选：只要碰到 MonsterController 任意子节点就销毁整只怪物
+            if (destroyMonsterControllerOwner && other.GetComponentInParent<MonsterController>() is MonsterController monster)
+            {
+                Debug.Log($"【WallDeathZone】检测到 MonsterController，销毁怪物: {monster.name}", monster);
+                Destroy(monster.gameObject);
             }
         }
     }
