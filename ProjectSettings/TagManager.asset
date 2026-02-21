@@ -6,6 +6,7 @@ TagManager:
   tags:
   - LockInteraction
   - CinemachineTarget
+  - Monster
   layers:
   - Default
   - TransparentFX

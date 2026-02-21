@@ -19,6 +19,7 @@ namespace LSP.Gameplay
 
         private void OnTriggerEnter(Collider other)
         {
+            Debug.Log($"【WallDeathZone】墙壁碾碎了边缘的雕像: {other.name}");
             // 1. 碰到玩家 -> 触发你配好的 Event System 死亡事件
             if (other.CompareTag("Player"))
             {
@@ -28,7 +29,7 @@ namespace LSP.Gameplay
             // 2. 碰到雕像/怪物 -> 方案A：冷酷清场，直接销毁！
             else if (other.CompareTag(targetTag))
             {
-                // Debug.Log($"【WallDeathZone】墙壁碾碎了边缘的雕像: {other.name}");
+                Debug.Log($"【WallDeathZone】墙壁碾碎了边缘的雕像: {other.name}");
                 Destroy(other.gameObject);
             }
         }
