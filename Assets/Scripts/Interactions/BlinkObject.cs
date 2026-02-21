@@ -9,7 +9,7 @@ public class BlinkObject : MonoBehaviour
     private int blindLayerId;
 
     // 【新增】只有当这个变量为 true 时，这个物体才允许在眨眼时显示
-    private bool isCurrentTarget = false;
+    [SerializeField]private bool isCurrentTarget = false;
 
     void Start()
     {
