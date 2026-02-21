@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events; // 【新增】引入事件系统命名空间
 
 namespace LSP.Gameplay
 {
@@ -34,6 +35,20 @@ namespace LSP.Gameplay
         [Tooltip("是否输出调试日志。")]
         [SerializeField]
         private bool verboseLog;
+
+        // =========================================================
+        // 【新增】事件与状态追踪
+        // =========================================================
+        [Header("Events (流程控制)")]
+        [Tooltip("当场上存活的怪物数量小于 5 时触发 (仅触发一次)")]
+        public UnityEvent onMonstersLessThanFive;
+
+        [Tooltip("当场上所有怪物都被清空 (数量 == 0) 时触发 (仅触发一次)")]
+        public UnityEvent onAllMonstersCleared;
+
+        private bool _hasTriggeredLessThanFive = false;
+        private bool _hasTriggeredAllCleared = false;
+
 
         private int nextMonsterIndex;
         private MonsterController activeMonster;
@@ -73,6 +88,10 @@ namespace LSP.Gameplay
             activeMonster = null;
             hasStarted = true;
 
+            // 【新增】重置事件触发状态，方便重复游玩
+            _hasTriggeredLessThanFive = false;
+            _hasTriggeredAllCleared = false;
+
             if (disableAllControllersOnStart)
             {
                 DisableAllControllers();
@@ -93,6 +112,9 @@ namespace LSP.Gameplay
                 return;
             }
 
+            // 【新增】每帧检查剩余怪物数量，触发对应事件
+            CheckRemainingMonsters();
+
             if (IsCurrentMonsterValidAndRunning())
             {
                 return;
@@ -100,6 +122,42 @@ namespace LSP.Gameplay
 
             activeMonster = null;
             TryActivateNextMonster();
+        }
+
+        // =========================================================
+        // 【新增方法】检查剩余怪物数量并触发事件
+        // =========================================================
+        private void CheckRemainingMonsters()
+        {
+            // 如果两个事件都已经触发过了，就不需要再数了，节省性能
+            if (_hasTriggeredAllCleared) return;
+
+            int aliveCount = 0;
+            
+            // 遍历列表，统计还没有被 Destroy (不为 null) 的怪物数量
+            for (int i = 0; i < monsterQueue.Count; i++)
+            {
+                if (monsterQueue[i] != null)
+                {
+                    aliveCount++;
+                }
+            }
+
+            // 检查：小于 5 的时候触发 (仅触发一次)
+            if (aliveCount < 5 && !_hasTriggeredLessThanFive)
+            {
+                _hasTriggeredLessThanFive = true;
+                if (verboseLog) Debug.Log("【MonsterSequentialActivator】剩余怪物小于5，触发高潮事件！", this);
+                onMonstersLessThanFive?.Invoke();
+            }
+
+            // 检查：等于 0 的时候触发 (仅触发一次)
+            if (aliveCount == 0 && !_hasTriggeredAllCleared)
+            {
+                _hasTriggeredAllCleared = true;
+                if (verboseLog) Debug.Log("【MonsterSequentialActivator】所有怪物已清除，触发通关事件！", this);
+                onAllMonstersCleared?.Invoke();
+            }
         }
 
         private bool IsCurrentMonsterValidAndRunning()
@@ -231,6 +289,10 @@ namespace LSP.Gameplay
             nextMonsterIndex = 0;
             activeMonster = null;
             hasStarted = false;
+            
+            // 【新增】重设队列时也重置事件触发器
+            _hasTriggeredLessThanFive = false;
+            _hasTriggeredAllCleared = false;
         }
 
         public void TriggerTryActivateNext()
