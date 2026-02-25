@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using System.Collections;
 using LSP.Gameplay;
 using StarterAssets;
@@ -38,14 +39,17 @@ public class LevelOneFlowDirector : MonoBehaviour
     [Header("===== 结局时间控制 =====")]
     [Tooltip("死亡动画大概播多久？(秒) 等动画播完才会出 UI")]
     [SerializeField] private float deathAnimationDuration = 3.5f;
-    // === 【修改点 1】不再直接引用门，而是使用通用事件 ===
+
     [Header("===== 剧情事件 (Events) =====")]
     [Tooltip("当怪物消失进入潜伏期时触发（请在这里绑定关门、锁死等逻辑）")]
     [SerializeField] private UnityEvent onMonsterDisappeared;
     
-    [Header("===== 触发条件 (新增) =====")]
-    // 【新增 1】这就是你要加的那个 bool，用来标记玩家是否到了特定位置
+    [Header("===== 触发条件 =====")]
     [SerializeField] private bool isPlayerInTrapZone = false;
+
+    [Header("===== 结局场景清理 =====")]
+    [Tooltip("除了玩家和UI以外，这些物体也要保留（比如灯光、地面等）")]
+    [SerializeField] private GameObject[] additionalObjectsToKeep;
     
     private enum Stage { Setup, WaitingForLookAway1, Transformation, WaitingForLookAway2, Disappearance, CountingDown, Finished }
     private Stage currentStage = Stage.Setup;
@@ -86,7 +90,7 @@ public class LevelOneFlowDirector : MonoBehaviour
                 if (isSeeingMonster) currentStage = Stage.WaitingForLookAway2;
                 break;
             case Stage.WaitingForLookAway2:
-                if (!isSeeingMonster )
+                if (!isSeeingMonster)
                 {
                     Debug.Log("2");
                     PerformDisappearance();
@@ -111,7 +115,6 @@ public class LevelOneFlowDirector : MonoBehaviour
         }
     }
     
-    // 【新增 2】给外部触发器调用的方法
     public void SetPlayerInTrapZone(bool isInZone)
     {
         isPlayerInTrapZone = isInZone;
@@ -141,65 +144,44 @@ public class LevelOneFlowDirector : MonoBehaviour
         ExecuteJumpscare();
     }
 
-    // === 自动寻找玩家的核心修改 ===
-    // 这里把原来的 void 改成了协程启动器
     private void ExecuteJumpscare()
     {
         currentStage = Stage.Finished;
         Debug.Log("【导演】触发死亡流程！");
-
-        // 启动协程，开始“先杀人 -> 等动画 -> 出UI”的流程
         StartCoroutine(JumpscareSequenceRoutine());
     }
 
-    // 新增的协程逻辑
-    // 新增的协程逻辑
     private IEnumerator JumpscareSequenceRoutine()
     {
-        // 1. 播放 Jumpscare 音效
         if (audioSource && jumpScareSound) audioSource.PlayOneShot(jumpScareSound);
 
-        // 2. 找到玩家
         PlayerStateController player = FindObjectOfType<PlayerStateController>();
 
         if (player != null)
         {
             var deathSequence = player.GetComponent<PlayerExecutionDeathSequence>();
             
-            // 【关键】防止原本的脚本自动跳场景，必须按住它
             if (deathSequence != null)
             {
                 deathSequence.SuppressAutomaticSceneLoad(); 
             }
 
-            // 3. 触发玩家死亡动画
             Debug.Log($"【流程】玩家死亡，开始播放动画，等待 {deathAnimationDuration} 秒...");
             player.Kill();
-            
-            // 为了防止玩家在死亡动画期间还能乱动（双重保险），可以先锁住输入
-            // var input = player.GetComponent<StarterAssetsInputs>();
-            // if (input != null) input.cursorInputForLook = false;
 
-            // =======================================================
-            // 4. 【核心等待】让程序暂停，等待动画播完
-            // 务必在 Inspector 面板里把 deathAnimationDuration 设置得比动画长一点点
-            // =======================================================
             yield return new WaitForSeconds(deathAnimationDuration);
 
             Debug.Log("【流程】动画等待结束，显示 UI");
 
-            // 5. 动画播完了，现在激活 UI
             if (endgameCanvas != null) 
             {
                 endgameCanvas.gameObject.SetActive(true);
-                
-                // 【重要】如果你希望死亡后玩家模型还在（比如躺在地上），不要 SetActive(false)
-                // 但如果你希望只留下 UI，可以隐藏玩家。建议不要隐藏，否则摄像机可能会黑屏。
-                // player.gameObject.SetActive(false); 
 
-                // 6. 彻底解锁鼠标光标 (确保玩家能看见鼠标并点击 UI 按钮)
-                Cursor.lockState = CursorLockMode.None; // 解除锁定
-                Cursor.visible = true;                  // 显示鼠标
+                // ====== 【新增】隐藏场景中除玩家和UI以外的所有物体 ======
+                HideAllExcept(player.gameObject, endgameCanvas.gameObject);
+
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
             }
             else
             {
@@ -210,5 +192,58 @@ public class LevelOneFlowDirector : MonoBehaviour
         {
             Debug.LogError("【错误】导演找不到 PlayerStateController，无法执行死亡流程！");
         }
+    }
+
+    /// <summary>
+    /// 遍历当前场景的所有根物体，把除了玩家、UI、以及手动指定保留的物体以外的全部隐藏。
+    /// </summary>
+    private void HideAllExcept(GameObject playerRoot, GameObject canvasRoot)
+    {
+        // 找到玩家和 UI 各自的最顶层根物体（场景层级第一层）
+        Transform playerSceneRoot = GetSceneRoot(playerRoot.transform);
+        Transform canvasSceneRoot = GetSceneRoot(canvasRoot.transform);
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        GameObject[] rootObjects = activeScene.GetRootGameObjects();
+
+        foreach (GameObject rootObj in rootObjects)
+        {
+            // 保留玩家
+            if (rootObj.transform == playerSceneRoot) continue;
+            // 保留 UI
+            if (rootObj.transform == canvasSceneRoot) continue;
+            // 保留自身（协程还在跑，不能关自己）
+            if (rootObj == this.gameObject || GetSceneRoot(this.transform) == rootObj.transform) continue;
+            // 保留手动指定的额外物体
+            if (ShouldKeep(rootObj)) continue;
+
+            rootObj.SetActive(false);
+            Debug.Log($"【清理】已隐藏: {rootObj.name}");
+        }
+    }
+
+    /// <summary>
+    /// 沿 parent 链向上找到场景最顶层的根 Transform
+    /// </summary>
+    private Transform GetSceneRoot(Transform t)
+    {
+        while (t.parent != null) t = t.parent;
+        return t;
+    }
+
+    /// <summary>
+    /// 检查某个根物体是否在"额外保留"列表中
+    /// </summary>
+    private bool ShouldKeep(GameObject rootObj)
+    {
+        if (additionalObjectsToKeep == null) return false;
+        foreach (var keep in additionalObjectsToKeep)
+        {
+            if (keep == null) continue;
+            // 如果保留列表里的物体本身就是根物体，或者它的根物体匹配
+            if (keep == rootObj || GetSceneRoot(keep.transform).gameObject == rootObj)
+                return true;
+        }
+        return false;
     }
 }
