@@ -141,7 +141,7 @@ namespace LSP.Gameplay
                 return;
             }
 
-            Destroy(monster.gameObject);
+            monster.TriggerDeath();
         }
     }
 }

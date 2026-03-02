@@ -11,6 +11,14 @@ namespace LSP.Gameplay
     /// </summary>
     public class MonsterSequentialActivator : MonoBehaviour
     {
+        private struct AnimatorPlaybackSnapshot
+        {
+            public Animator animator;
+            public bool wasEnabled;
+            public float speed;
+            public bool pausedByActivator;
+        }
+
         [Header("References")]
         [SerializeField]
         private PlayerVision playerVision;
@@ -53,6 +61,7 @@ namespace LSP.Gameplay
         private int nextMonsterIndex;
         private MonsterController activeMonster;
         private bool hasStarted;
+        private readonly Dictionary<MonsterController, AnimatorPlaybackSnapshot> animatorSnapshots = new Dictionary<MonsterController, AnimatorPlaybackSnapshot>();
 
         private void Awake()
         {
@@ -99,10 +108,12 @@ namespace LSP.Gameplay
             else if (TryUseAlreadyEnabledMonster())
             {
                 DisableOtherControllers(activeMonster);
+                EnforceAnimatorPlaybackState();
                 return;
             }
 
             TryActivateNextMonster();
+            EnforceAnimatorPlaybackState();
         }
 
         private void Update()
@@ -117,11 +128,13 @@ namespace LSP.Gameplay
 
             if (IsCurrentMonsterValidAndRunning())
             {
+                EnforceAnimatorPlaybackState();
                 return;
             }
 
             activeMonster = null;
             TryActivateNextMonster();
+            EnforceAnimatorPlaybackState();
         }
 
         // =========================================================
@@ -208,6 +221,7 @@ namespace LSP.Gameplay
             activeMonster = nextMonster;
             nextMonsterIndex++;
             DisableOtherControllers(activeMonster);
+            ResumeMonsterAnimation(activeMonster);
 
             if (verboseLog)
             {
@@ -226,6 +240,7 @@ namespace LSP.Gameplay
                 }
 
                 monster.enabled = false;
+                PauseMonsterAnimation(monster);
             }
         }
 
@@ -240,7 +255,10 @@ namespace LSP.Gameplay
                 }
 
                 monster.enabled = false;
+                PauseMonsterAnimation(monster);
             }
+
+            ResumeMonsterAnimation(current);
         }
 
         private bool TryUseAlreadyEnabledMonster()
@@ -260,6 +278,7 @@ namespace LSP.Gameplay
 
                 activeMonster = monster;
                 nextMonsterIndex = i + 1;
+                ResumeMonsterAnimation(activeMonster);
 
                 if (verboseLog)
                 {
@@ -300,7 +319,130 @@ namespace LSP.Gameplay
             if (activeMonster == null)
             {
                 TryActivateNextMonster();
+                EnforceAnimatorPlaybackState();
             }
+        }
+
+        private void EnforceAnimatorPlaybackState()
+        {
+            for (int i = 0; i < monsterQueue.Count; i++)
+            {
+                MonsterController monster = monsterQueue[i];
+                if (monster == null)
+                {
+                    continue;
+                }
+
+                if (ShouldPlayAnimation(monster))
+                {
+                    ResumeMonsterAnimation(monster);
+                }
+                else
+                {
+                    PauseMonsterAnimation(monster);
+                }
+            }
+        }
+
+        private bool ShouldPlayAnimation(MonsterController monster)
+        {
+            if (monster == null || activeMonster != monster)
+            {
+                return false;
+            }
+
+            if (!monster.gameObject.activeInHierarchy || !monster.enabled || monster.IsDead)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private void PauseMonsterAnimation(MonsterController monster)
+        {
+            Animator animator = GetAnimator(monster);
+            if (animator == null)
+            {
+                return;
+            }
+
+            CacheAnimatorSnapshot(monster, animator);
+            if (animatorSnapshots.TryGetValue(monster, out AnimatorPlaybackSnapshot snapshot))
+            {
+                if (!snapshot.pausedByActivator)
+                {
+                    snapshot.wasEnabled = animator.enabled;
+                    snapshot.speed = animator.speed;
+                    snapshot.pausedByActivator = true;
+                    animatorSnapshots[monster] = snapshot;
+                }
+            }
+
+            animator.speed = 0f;
+            animator.enabled = false;
+        }
+
+        private void ResumeMonsterAnimation(MonsterController monster)
+        {
+            Animator animator = GetAnimator(monster);
+            if (animator == null)
+            {
+                return;
+            }
+
+            CacheAnimatorSnapshot(monster, animator);
+
+            if (animatorSnapshots.TryGetValue(monster, out AnimatorPlaybackSnapshot snapshot))
+            {
+                if (!snapshot.pausedByActivator)
+                {
+                    return;
+                }
+
+                animator.enabled = snapshot.wasEnabled;
+                animator.speed = snapshot.speed;
+                snapshot.pausedByActivator = false;
+                animatorSnapshots[monster] = snapshot;
+            }
+            else
+            {
+                animator.enabled = true;
+                animator.speed = 1f;
+            }
+        }
+
+        private void CacheAnimatorSnapshot(MonsterController monster, Animator animator)
+        {
+            if (monster == null || animator == null || animatorSnapshots.ContainsKey(monster))
+            {
+                return;
+            }
+
+            AnimatorPlaybackSnapshot snapshot = new AnimatorPlaybackSnapshot
+            {
+                animator = animator,
+                wasEnabled = animator.enabled,
+                speed = animator.speed,
+                pausedByActivator = false
+            };
+
+            animatorSnapshots.Add(monster, snapshot);
+        }
+
+        private Animator GetAnimator(MonsterController monster)
+        {
+            if (monster == null)
+            {
+                return null;
+            }
+
+            if (animatorSnapshots.TryGetValue(monster, out AnimatorPlaybackSnapshot snapshot) && snapshot.animator != null)
+            {
+                return snapshot.animator;
+            }
+
+            return monster.GetComponentInChildren<Animator>(true);
         }
     }
 }

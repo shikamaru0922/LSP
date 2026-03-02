@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -9,7 +10,8 @@ namespace LSP.Gameplay
     {
         Stationary,
         Chasing,
-        Returning
+        Returning,
+        Dead
     }
 
     /// <summary>
@@ -19,6 +21,20 @@ namespace LSP.Gameplay
     [RequireComponent(typeof(NavMeshAgent))]
     public class MonsterController : MonoBehaviour
     {
+        [Serializable]
+        private struct DeathMaterialOverride
+        {
+            [Tooltip("Renderer that should swap to dissolve material on death.")]
+            public Renderer targetRenderer;
+
+            [Tooltip("Material slot index on the target renderer.")]
+            [Min(0)]
+            public int materialIndex;
+
+            [Tooltip("Dissolve material used for this slot.")]
+            public Material replacementMaterial;
+        }
+
         [SerializeField]
         private Transform chaseTarget;
 
@@ -123,6 +139,37 @@ namespace LSP.Gameplay
         [SerializeField]
         private float fallbackMoveSpeed = 2.5f;
 
+        [Header("Death Dissolve")]
+        [Tooltip("Manual material replacement list used when this monster enters the Dead state.")]
+        [SerializeField]
+        private List<DeathMaterialOverride> deathMaterialOverrides = new List<DeathMaterialOverride>();
+
+        [Tooltip("Float property name on dissolve materials. Example: _height.")]
+        [SerializeField]
+        private string dissolveHeightPropertyName = "_height";
+
+        [Tooltip("Height value applied right after death materials are swapped.")]
+        [SerializeField]
+        private float dissolveHeightStart = -7.3f;
+
+        [Tooltip("Height value to reach at the end of dissolve animation.")]
+        [SerializeField]
+        private float dissolveHeightEnd = 4f;
+
+        [Tooltip("How quickly height moves from start to end (units per second).")]
+        [Min(0f)]
+        [SerializeField]
+        private float dissolveHeightSpeed = 2f;
+
+        [Tooltip("Destroy this monster GameObject after dissolve completes.")]
+        [SerializeField]
+        private bool destroyAfterDissolve = true;
+
+        [Tooltip("Optional delay before destruction after dissolve ends.")]
+        [Min(0f)]
+        [SerializeField]
+        private float destroyDelayAfterDissolve = 0f;
+
         public static event Action<MonsterController> MonsterReset;
 
         private Collider monsterCollider;
@@ -147,9 +194,13 @@ namespace LSP.Gameplay
         private Coroutine detectionHowlReleaseRoutine;
         private float detectionHowlBaseVolume = 1f;
         private float detectionHowlVolumeMultiplier = 1f;
+        private Coroutine deathRoutine;
+        private int dissolveHeightPropertyId;
+        private readonly List<Material> activeDissolveMaterials = new List<Material>();
 
         public MonsterState CurrentState => currentState;
         public float CurrentMoveSpeed => IsNavMeshAgentAvailable ? navMeshAgent.speed : fallbackMoveSpeed;
+        public bool IsDead => currentState == MonsterState.Dead;
 
         private void Awake()
         {
@@ -207,6 +258,7 @@ namespace LSP.Gameplay
             }
 
             detectionHowlVolumeMultiplier = 1f;
+            CacheDissolveHeightPropertyId();
         }
 
         private void OnEnable()
@@ -230,6 +282,12 @@ namespace LSP.Gameplay
                 disablerRoutine = null;
             }
 
+            if (deathRoutine != null)
+            {
+                StopCoroutine(deathRoutine);
+                deathRoutine = null;
+            }
+
             if (navAgentDisabledByVision && navMeshAgent != null)
             {
                 navMeshAgent.enabled = true;
@@ -248,6 +306,13 @@ namespace LSP.Gameplay
 
         private void Update()
         {
+            if (currentState == MonsterState.Dead)
+            {
+                StopFootstepAudio();
+                previousPosition = transform.position;
+                return;
+            }
+
             float deltaTime = Time.deltaTime;
 
             if (!isWorldAbnormal)
@@ -477,6 +542,11 @@ namespace LSP.Gameplay
         /// </summary>
         public void ApplyDisablerEffect()
         {
+            if (currentState == MonsterState.Dead)
+            {
+                return;
+            }
+
             if (disablerRoutine != null)
             {
                 StopCoroutine(disablerRoutine);
@@ -501,11 +571,162 @@ namespace LSP.Gameplay
         }
 
         /// <summary>
+        /// Puts the monster into Dead state, applies manual dissolve materials, animates height, and optionally destroys it.
+        /// </summary>
+        public bool TriggerDeath()
+        {
+            if (currentState == MonsterState.Dead)
+            {
+                return false;
+            }
+
+            currentState = MonsterState.Dead;
+            restartTriggered = true;
+            returningIgnoresVision = false;
+            timeSinceLastSeen = visionHoldDuration;
+
+            if (disablerRoutine != null)
+            {
+                StopCoroutine(disablerRoutine);
+                disablerRoutine = null;
+            }
+
+            RestoreMoveSpeed();
+            StopNavMeshAgent();
+            RestoreAnimatorFromVision();
+            StopFootstepAudio();
+            StopDetectionHowlControl();
+
+            if (navMeshAgent != null && navMeshAgent.enabled)
+            {
+                navMeshAgent.velocity = Vector3.zero;
+                navMeshAgent.isStopped = true;
+            }
+
+            if (monsterCollider != null)
+            {
+                monsterCollider.enabled = false;
+            }
+
+            if (animator != null)
+            {
+                animator.speed = 0f;
+            }
+
+            if (deathRoutine != null)
+            {
+                StopCoroutine(deathRoutine);
+            }
+
+            deathRoutine = StartCoroutine(DeathDissolveRoutine());
+            return true;
+        }
+
+        private IEnumerator DeathDissolveRoutine()
+        {
+            activeDissolveMaterials.Clear();
+            ApplyDeathMaterialOverrides(activeDissolveMaterials);
+            ApplyDissolveHeight(dissolveHeightStart);
+
+            float speed = Mathf.Max(0f, dissolveHeightSpeed);
+            float currentHeight = dissolveHeightStart;
+            float targetHeight = dissolveHeightEnd;
+
+            if (speed > Mathf.Epsilon)
+            {
+                while (!Mathf.Approximately(currentHeight, targetHeight))
+                {
+                    currentHeight = Mathf.MoveTowards(currentHeight, targetHeight, speed * Time.deltaTime);
+                    ApplyDissolveHeight(currentHeight);
+                    yield return null;
+                }
+            }
+            else
+            {
+                ApplyDissolveHeight(targetHeight);
+            }
+
+            deathRoutine = null;
+
+            if (!destroyAfterDissolve)
+            {
+                yield break;
+            }
+
+            if (destroyDelayAfterDissolve > 0f)
+            {
+                yield return new WaitForSeconds(destroyDelayAfterDissolve);
+            }
+
+            Destroy(gameObject);
+        }
+
+        private void ApplyDeathMaterialOverrides(List<Material> collectedMaterials)
+        {
+            if (deathMaterialOverrides == null || deathMaterialOverrides.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < deathMaterialOverrides.Count; i++)
+            {
+                DeathMaterialOverride materialOverride = deathMaterialOverrides[i];
+                if (materialOverride.targetRenderer == null || materialOverride.replacementMaterial == null)
+                {
+                    continue;
+                }
+
+                Material[] materials = materialOverride.targetRenderer.materials;
+                if (materials == null || materials.Length == 0)
+                {
+                    continue;
+                }
+
+                int materialIndex = Mathf.Clamp(materialOverride.materialIndex, 0, materials.Length - 1);
+                Material runtimeMaterial = new Material(materialOverride.replacementMaterial);
+                materials[materialIndex] = runtimeMaterial;
+                materialOverride.targetRenderer.materials = materials;
+                collectedMaterials.Add(runtimeMaterial);
+            }
+        }
+
+        private void ApplyDissolveHeight(float value)
+        {
+            if (dissolveHeightPropertyId == 0 || activeDissolveMaterials.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < activeDissolveMaterials.Count; i++)
+            {
+                Material material = activeDissolveMaterials[i];
+                if (material == null || !material.HasProperty(dissolveHeightPropertyId))
+                {
+                    continue;
+                }
+
+                material.SetFloat(dissolveHeightPropertyId, value);
+            }
+        }
+
+        private void CacheDissolveHeightPropertyId()
+        {
+            dissolveHeightPropertyId = string.IsNullOrWhiteSpace(dissolveHeightPropertyName)
+                ? 0
+                : Shader.PropertyToID(dissolveHeightPropertyName);
+        }
+
+        /// <summary>
         /// Explicitly sets the chase target. Useful if the monster is spawned at runtime.
         /// </summary>
         public void SetTarget(Transform target)
         {
             chaseTarget = target;
+
+            if (currentState == MonsterState.Dead)
+            {
+                return;
+            }
 
             if (currentState == MonsterState.Chasing)
             {
@@ -527,11 +748,21 @@ namespace LSP.Gameplay
 
         public void ResetToSpawn(bool ignoreVisionFreeze)
         {
+            if (currentState == MonsterState.Dead)
+            {
+                return;
+            }
+
             BeginReturnToSpawn(ignoreVisionFreeze);
         }
 
         private void BeginReturnToSpawn(bool ignoreVisionFreeze = false)
         {
+            if (currentState == MonsterState.Dead)
+            {
+                return;
+            }
+
             if (currentState == MonsterState.Returning)
             {
                 if (ignoreVisionFreeze && !returningIgnoresVision)
@@ -642,6 +873,12 @@ namespace LSP.Gameplay
             else
             {
                 navAgentDisabledByVision = false;
+            }
+
+            if (currentState == MonsterState.Dead)
+            {
+                StopNavMeshAgent();
+                return;
             }
 
             if (currentState == MonsterState.Chasing)
@@ -930,7 +1167,7 @@ namespace LSP.Gameplay
 
         private void TriggerProximityRestart(PlayerStateController playerOverride = null)
         {
-            if (restartTriggered)
+            if (restartTriggered || currentState == MonsterState.Dead)
             {
                 return;
             }
@@ -1143,6 +1380,13 @@ namespace LSP.Gameplay
         {
             isWorldAbnormal = state;
 
+            if (currentState == MonsterState.Dead)
+            {
+                StopNavMeshAgent();
+                ApplyAnimatorMovementState();
+                return;
+            }
+
             if (!isWorldAbnormal)
             {
                 CompleteReturnToSpawn();
@@ -1181,6 +1425,7 @@ namespace LSP.Gameplay
             }
 
             CacheAnimatorAnimationConfiguration();
+            CacheDissolveHeightPropertyId();
         }
 #endif
     }
