@@ -7,3 +7,4 @@ C:/Users/User/Documents/GitHub/LSP/Assets/Scenes/Ryder-Final.unity filter=lfs di
 Assets/Scenes/Ryder-Final.unity filter=lfs diff=lfs merge=lfs -text
 C:/Users/User/Documents/GitHub/LSP/Assets/Scenes/ZacheryScene/ZacheryScene/LightingData.asset filter=lfs diff=lfs merge=lfs -text
 Assets/Scenes/ZacheryScene/ZacheryScene/LightingData.asset filter=lfs diff=lfs merge=lfs -text
+Assets/Scenes/ZacheryScene/Level_Phase2_Zachery/LightingData.asset filter=lfs diff=lfs merge=lfs -text
