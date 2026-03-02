@@ -67,7 +67,7 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _edgewidth: 0.19
-    - _height: -4.21
+    - _height: -7.3
     m_Colors:
     - _color: {r: 0, g: 0, b: 0, a: 0}
     - _edgecolor: {r: 1, g: 1, b: 1, a: 1}
