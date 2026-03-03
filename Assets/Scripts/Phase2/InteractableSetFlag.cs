@@ -1,6 +1,7 @@
 using LSP.Gameplay;
 using LSP.Gameplay.Interactions;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class InteractableSetFlag : MonoBehaviour, IInteractable
 {
@@ -42,6 +43,10 @@ public class InteractableSetFlag : MonoBehaviour, IInteractable
     [Header("===== 连带显示 (可选) =====")]
     [Tooltip("触发成功后，要显示哪个原本隐藏的物体？")]
     public GameObject objectToShow; 
+
+    [Header("===== 成功回调 (可选) =====")]
+    [Tooltip("触发成功后调用，可用于播放清洗/动画等演出。")]
+    public UnityEvent onTriggeredSuccess;
 
     // 防止重复触发的内部标记
     private bool _hasTriggered = false;
@@ -128,6 +133,12 @@ public class InteractableSetFlag : MonoBehaviour, IInteractable
         if (objectToShow != null)
         {
             objectToShow.SetActive(true);
+        }
+
+        // C2. 触发扩展事件（例如：清洗演出）
+        if (onTriggeredSuccess != null)
+        {
+            onTriggeredSuccess.Invoke();
         }
 
         // D. 隐藏/销毁自己
