@@ -1,6 +1,8 @@
 using UnityEngine;
 using TMPro; 
 using UnityEngine.Events; 
+using LSP.Gameplay;
+using StarterAssets;
 
 public class PasswordKeypad : MonoBehaviour
 {
@@ -29,20 +31,46 @@ public class PasswordKeypad : MonoBehaviour
     [Tooltip("密码错误时触发")]
     public UnityEvent onPasswordWrong;
 
+    [Header("依赖 (可选)")]
+    [Tooltip("打开密码 UI 时用于暂停交互的控制器，不填会自动查找")]
+    [SerializeField] private PlayerInteractionController interactionController;
+
+    [Tooltip("StarterAssets 输入组件，不填会自动查找")]
+    [SerializeField] private StarterAssetsInputs starterInputs;
+
     private bool isSolved = false;
     private bool isOpen = false; // 【新增】用于追踪当前UI是否处于打开状态
 
     private InteractableSetFlag _interactFlagScript;
+    private bool cursorOverrideActive;
+    private CursorLockMode cachedCursorLockMode;
+    private bool cachedCursorVisible;
+    private bool starterInputOverrideActive;
+    private bool cachedCursorLocked;
+    private bool cachedCursorInputForLook;
     
     void Start()
     {
         _interactFlagScript = GetComponent<InteractableSetFlag>();
         
+        if (interactionController == null)
+        {
+            interactionController = FindObjectOfType<PlayerInteractionController>();
+        }
+
+        if (starterInputs == null)
+        {
+            starterInputs = FindObjectOfType<StarterAssetsInputs>();
+        }
+        
         // 游戏开始时隐藏密码锁
         if(uiPanel != null) uiPanel.SetActive(false);
         
         // 监听输入框的回车键 (Enter提交)
-        inputField.onSubmit.AddListener(delegate { CheckPassword(); });
+        if (inputField != null)
+        {
+            inputField.onSubmit.AddListener(OnInputSubmit);
+        }
     }
 
     // 【新增】每帧检测玩家是否按下退出键
@@ -65,17 +93,33 @@ public class PasswordKeypad : MonoBehaviour
             Debug.Log("密码锁已经解开了");
             return; 
         }
+        
+        if (isOpen)
+        {
+            return;
+        }
 
         isOpen = true; // 【新增】标记状态为打开
-        uiPanel.SetActive(true);
-        inputField.text = ""; // 清空上次输入的
+        SetUiInputState(true);
+        
+        if (uiPanel != null)
+        {
+            uiPanel.SetActive(true);
+        }
+        
+        if (inputField != null)
+        {
+            inputField.text = ""; // 清空上次输入的
+            inputField.Select();
+            inputField.ActivateInputField();
+        }
+        
         if(feedbackText) feedbackText.text = "";
         
-        // 激活输入框焦点，不用鼠标点也能直接打字，打完直接按回车
-        inputField.ActivateInputField(); 
-
-        // 暂停游戏或锁定玩家视角 (根据你之前的 Interaction 代码逻辑来)
-        // SetPlayerInput(false); 
+        if (IsInvoking(nameof(CloseKeypad)))
+        {
+            CancelInvoke(nameof(CloseKeypad));
+        }
     }
 
     /// <summary>
@@ -83,11 +127,19 @@ public class PasswordKeypad : MonoBehaviour
     /// </summary>
     public void CloseKeypad()
     {
-        isOpen = false; // 【新增】标记状态为关闭
-        uiPanel.SetActive(false);
+        if (!isOpen && (uiPanel == null || !uiPanel.activeSelf))
+        {
+            return;
+        }
         
-        // 【重要】如果你有关闭玩家操作的代码，记得在这里恢复
-        // SetPlayerInput(true);
+        isOpen = false; // 【新增】标记状态为关闭
+        
+        if (uiPanel != null)
+        {
+            uiPanel.SetActive(false);
+        }
+
+        SetUiInputState(false);
     }
 
     /// <summary>
@@ -95,13 +147,22 @@ public class PasswordKeypad : MonoBehaviour
     /// </summary>
     public void CheckPassword()
     {
+        if (inputField == null)
+        {
+            Debug.LogWarning("PasswordKeypad 缺少 InputField，无法校验密码。");
+            return;
+        }
+
         if (inputField.text == correctPassword)
         {
             // --- 密码正确 ---
             Debug.Log("密码正确！");
             isSolved = true;
-            if(feedbackText) feedbackText.text = "ACCESS GRANTED";
-            feedbackText.color = Color.green;
+            if (feedbackText)
+            {
+                feedbackText.text = "ACCESS GRANTED";
+                feedbackText.color = Color.green;
+            }
 
             // 触发事件
             onPasswordCorrect.Invoke(); 
@@ -118,14 +179,125 @@ public class PasswordKeypad : MonoBehaviour
         {
             // --- 密码错误 ---
             Debug.Log("密码错误！");
-            if(feedbackText) feedbackText.text = "INVALID PASSWORD";
-            feedbackText.color = Color.red;
-            inputField.text = ""; // 清空重输
+            if (feedbackText)
+            {
+                feedbackText.text = "INVALID PASSWORD";
+                feedbackText.color = Color.red;
+            }
+
+            if (inputField != null)
+            {
+                inputField.text = ""; // 清空重输
+            }
             
             // 重新强制聚焦，确保玩家可以无缝继续敲键盘试下一个密码
-            inputField.ActivateInputField(); 
+            if (inputField != null)
+            {
+                inputField.Select();
+                inputField.ActivateInputField();
+            }
             
             onPasswordWrong.Invoke();
         }
+    }
+
+    private void OnDisable()
+    {
+        if (isOpen)
+        {
+            CloseKeypad();
+        }
+        else
+        {
+            SetUiInputState(false);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (inputField != null)
+        {
+            inputField.onSubmit.RemoveListener(OnInputSubmit);
+        }
+    }
+
+    private void OnInputSubmit(string _)
+    {
+        CheckPassword();
+    }
+
+    private void SetUiInputState(bool uiOpened)
+    {
+        if (interactionController != null)
+        {
+            interactionController.IsUiOpen = uiOpened;
+        }
+
+        if (uiOpened)
+        {
+            BeginCursorOverride();
+            BeginStarterInputOverride();
+        }
+        else
+        {
+            EndStarterInputOverride();
+            EndCursorOverride();
+        }
+    }
+
+    private void BeginCursorOverride()
+    {
+        if (cursorOverrideActive)
+        {
+            return;
+        }
+
+        cachedCursorLockMode = Cursor.lockState;
+        cachedCursorVisible = Cursor.visible;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        cursorOverrideActive = true;
+    }
+
+    private void EndCursorOverride()
+    {
+        if (!cursorOverrideActive)
+        {
+            return;
+        }
+
+        Cursor.lockState = cachedCursorLockMode;
+        Cursor.visible = cachedCursorVisible;
+        cursorOverrideActive = false;
+    }
+
+    private void BeginStarterInputOverride()
+    {
+        if (starterInputs == null || starterInputOverrideActive)
+        {
+            return;
+        }
+
+        cachedCursorLocked = starterInputs.cursorLocked;
+        cachedCursorInputForLook = starterInputs.cursorInputForLook;
+        starterInputs.cursorLocked = false;
+        starterInputs.cursorInputForLook = false;
+        starterInputOverrideActive = true;
+    }
+
+    private void EndStarterInputOverride()
+    {
+        if (!starterInputOverrideActive)
+        {
+            return;
+        }
+
+        if (starterInputs != null)
+        {
+            starterInputs.cursorLocked = cachedCursorLocked;
+            starterInputs.cursorInputForLook = cachedCursorInputForLook;
+        }
+
+        starterInputOverrideActive = false;
     }
 }
