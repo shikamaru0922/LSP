@@ -22,6 +22,21 @@ public class StatueRotator : MonoBehaviour, IInteractable
     // 内部状态锁：防止在旋转时再次触发
     private bool _isRotating = false;
 
+    private void Awake()
+    {
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+        }
+
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 1f;
+        }
+    }
+
     // =========================================================
     // IInteractable 接口实现
     // =========================================================

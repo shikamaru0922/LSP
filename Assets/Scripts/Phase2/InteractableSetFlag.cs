@@ -107,7 +107,7 @@ public class InteractableSetFlag : MonoBehaviour, IInteractable
                 Debug.Log($"【{source}失败】缺上前置条件: {prerequisiteFlagName}");
 
                 // 只有按键交互时才播拒绝声音，不然走过去一直播声音很吵
-                if (source == "按键交互" && audioSource && failSound)
+                if (source == "按键交互" && failSound)
                 {
                     AudioSource.PlayClipAtPoint(failSound, transform.position);
                 }
@@ -124,7 +124,7 @@ public class InteractableSetFlag : MonoBehaviour, IInteractable
 
         // B. 播放音效
         AudioClip clipToPlay = successSound != null ? successSound : pickupSound;
-        if (playSound && audioSource && clipToPlay)
+        if (playSound && clipToPlay)
         {
             AudioSource.PlayClipAtPoint(clipToPlay, transform.position);
         }

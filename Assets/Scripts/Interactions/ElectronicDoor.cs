@@ -56,6 +56,12 @@ namespace MuseumGame.Interaction
         private void Awake()
         {
             if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
+            if (_audioSource == null)
+            {
+                _audioSource = gameObject.AddComponent<AudioSource>();
+                _audioSource.playOnAwake = false;
+                _audioSource.spatialBlend = 1f;
+            }
             
             _isLocked = _startLocked;
 

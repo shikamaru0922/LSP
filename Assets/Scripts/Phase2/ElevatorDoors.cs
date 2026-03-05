@@ -45,6 +45,18 @@ public class ElevatorDoors : MonoBehaviour
 
     private void Start()
     {
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+        }
+
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 1f;
+        }
+
         if (leftDoor == null || rightDoor == null)
         {
             Debug.LogError("【电梯错误】请在 Inspector 里拖入左右两个门板！");

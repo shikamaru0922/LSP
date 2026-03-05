@@ -485,11 +485,11 @@ MonoBehaviour:
   _startLocked: 1
   _requiredKey: 0
   _audioSource: {fileID: 0}
-  _handleSound: {fileID: 0}
-  _openSfx: {fileID: 0}
-  _closeSfx: {fileID: 0}
-  _lockedSfx: {fileID: 0}
-  _unlockSfx: {fileID: 0}
+  _handleSound: {fileID: 8300000, guid: 36a1f8b21aea1b84e9bfdec95080dc90, type: 3}
+  _openSfx: {fileID: 8300000, guid: 0d0e1d274d37d9947843dbe88c27d3c4, type: 3}
+  _closeSfx: {fileID: 8300000, guid: 35c09260b282af348bc988ff2a3ce8d5, type: 3}
+  _lockedSfx: {fileID: 8300000, guid: 80adb27fe4a6d1b4a891cecaabee9d78, type: 3}
+  _unlockSfx: {fileID: 8300000, guid: 48cdbdd1c5ead294b8543ad22df2bcc9, type: 3}
   _onOpened:
     m_PersistentCalls:
       m_Calls: []

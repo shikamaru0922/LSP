@@ -29,6 +29,21 @@ public class XAxisRotator : MonoBehaviour
     // 内部状态锁，防止在旋转过程中被玩家狂按重复触发
     private bool _isRotating = false;
 
+    private void Awake()
+    {
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+        }
+
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 1f;
+        }
+    }
+
     // =========================================================
     // 【傻瓜式调用入口】
     // 你的 Event System 或者互动脚本，直接调用这个方法就行！
