@@ -8,24 +8,24 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
-  - enabled: 0
-    path: Assets/Scenes/UIScene/Start.unity
-    guid: 11d2455e300ae714d916ecce9a1b263e
-  - enabled: 0
+  - enabled: 1
+    path: Assets/Scenes/ZacheryScene/ZacheryScene.unity
+    guid: 8d380e019b1e12a49a938df51a82f2ca
+  - enabled: 1
     path: Assets/Scenes/Shikamaru_TestLevel/Level_Phase2.unity
     guid: 63ae3b8a723e9654e8d274f7286e5394
   - enabled: 0
+    path: Assets/Scenes/UIScene/Start.unity
+    guid: 11d2455e300ae714d916ecce9a1b263e
+  - enabled: 1
     path: Assets/Scenes/UIScene/Restart.unity
     guid: 09b374fc548104e4e84787d05631d2b5
-  - enabled: 0
+  - enabled: 1
     path: Assets/Scenes/UIScene/Win.unity
     guid: 88869c5fe7333444ca772aeed7f133d0
   - enabled: 0
     path: Assets/Scripts/HypeRate/HypeRate Heart Rate SDK/SampleScene.unity
     guid: 2cda990e2423bbf4892e6590ba056729
-  - enabled: 1
-    path: Assets/Scenes/ZacheryScene/ZacheryScene.unity
-    guid: 8d380e019b1e12a49a938df51a82f2ca
   - enabled: 1
     path: Assets/Scenes/ZacheryScene/Level_Phase2_Zachery.unity
     guid: 4f2bbd8e9b67b5547b29b56abe0020a3

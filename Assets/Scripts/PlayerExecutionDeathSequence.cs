@@ -31,14 +31,25 @@ namespace LSP.Gameplay
         [SerializeField]
         private bool reloadCurrentSceneWhenEmpty = true;
 
+        [Tooltip("Delay before loading the target scene after death completes.")]
+        [Min(0f)]
+        [SerializeField]
+        private float sceneLoadDelay = 0f;
+
+        [Tooltip("Use unscaled time for the scene-load delay.")]
+        [SerializeField]
+        private bool useUnscaledDelay = false;
+
         // 【新增 1】一个明确的开关，用来禁止自动跳转
         [Header("Control")]
         [Tooltip("如果勾选，动画播完后【绝对不会】自动切场景。适用于需要弹UI的情况。")]
         public bool disableAutomaticLoad = false; 
 
         private Coroutine deathRoutine;
+        private Coroutine delayedLoadRoutine;
         private bool deathCompleted;
         private string sceneToLoadOverride;
+        private float? sceneLoadDelayOverride;
 
         private void Reset()
         {
@@ -62,8 +73,10 @@ namespace LSP.Gameplay
         {
             if (stateController != null) stateController.PlayerKilled -= HandlePlayerKilled;
             if (deathRoutine != null) { StopCoroutine(deathRoutine); deathRoutine = null; }
+            if (delayedLoadRoutine != null) { StopCoroutine(delayedLoadRoutine); delayedLoadRoutine = null; }
             deathCompleted = false;
             sceneToLoadOverride = null;
+            sceneLoadDelayOverride = null;
             HideExecutionModel();
         }
 
@@ -75,6 +88,11 @@ namespace LSP.Gameplay
         public void OverrideSceneToLoad(string sceneName)
         {
             sceneToLoadOverride = sceneName;
+        }
+
+        public void OverrideSceneLoadDelay(float delaySeconds)
+        {
+            sceneLoadDelayOverride = Mathf.Max(0f, delaySeconds);
         }
 
         // 【新增 2】提供一个方法给导演脚本调用，专门用来“踩刹车”
@@ -151,8 +169,39 @@ namespace LSP.Gameplay
 
             if (!string.IsNullOrWhiteSpace(targetScene))
             {
-                SceneManager.LoadScene(targetScene);
+                float delay = sceneLoadDelayOverride.HasValue
+                    ? sceneLoadDelayOverride.Value
+                    : Mathf.Max(0f, sceneLoadDelay);
+
+                if (delay <= 0f)
+                {
+                    SceneManager.LoadScene(targetScene);
+                }
+                else
+                {
+                    if (delayedLoadRoutine != null)
+                    {
+                        StopCoroutine(delayedLoadRoutine);
+                    }
+
+                    delayedLoadRoutine = StartCoroutine(LoadSceneAfterDelay(targetScene, delay));
+                }
             }
+        }
+
+        private IEnumerator LoadSceneAfterDelay(string targetScene, float delay)
+        {
+            if (useUnscaledDelay)
+            {
+                yield return new WaitForSecondsRealtime(delay);
+            }
+            else
+            {
+                yield return new WaitForSeconds(delay);
+            }
+
+            delayedLoadRoutine = null;
+            SceneManager.LoadScene(targetScene);
         }
 
         private void ShowExecutionModel()

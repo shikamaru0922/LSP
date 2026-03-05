@@ -38,6 +38,16 @@ namespace LSP.Gameplay
         [Tooltip("降下/解除危机时的音效")]
         public AudioClip descendSound;
 
+        [Header("===== 碰撞稳定修复 =====")]
+        [Tooltip("运行时自动修复墙体物理配置，避免墙体乱飞。")]
+        public bool autoFixWallPhysics = true;
+        [Tooltip("将墙体 Rigidbody 强制设为 Kinematic，并禁用重力。")]
+        public bool forceKinematicRigidbody = true;
+        [Tooltip("冻结墙体旋转，防止碰撞后倾倒。")]
+        public bool freezeWallRotation = true;
+        [Tooltip("当墙体只有 Trigger 时自动补一个实体 BoxCollider，防止玩家穿墙。")]
+        public bool addBlockingColliderForTriggerWalls = true;
+
         private AudioSource _audioSource;
         private bool _isShrinking = false;
 
@@ -49,6 +59,8 @@ namespace LSP.Gameplay
                 _audioSource = gameObject.AddComponent<AudioSource>();
                 _audioSource.spatialBlend = 1f;
             }
+
+            PrepareWallsForStableCollision();
         }
 
         // =========================================================
@@ -84,7 +96,7 @@ namespace LSP.Gameplay
         // =========================================================
         // 【缩圈逻辑】持续执行
         // =========================================================
-        private void Update()
+        private void FixedUpdate()
         {
             if (!_isShrinking) return;
 
@@ -101,7 +113,8 @@ namespace LSP.Gameplay
 
                 if (currentDistance > minCenterDistance)
                 {
-                    wall.Translate(dirToCenter.normalized * (shrinkSpeed * Time.deltaTime), Space.World);
+                    Vector3 moveDelta = dirToCenter.normalized * (shrinkSpeed * Time.fixedDeltaTime);
+                    MoveWall(wall, moveDelta);
                 }
             }
         }
@@ -153,6 +166,126 @@ namespace LSP.Gameplay
                 }
                 */
             });
+        }
+
+        private void PrepareWallsForStableCollision()
+        {
+            if (!autoFixWallPhysics || walls == null)
+            {
+                return;
+            }
+
+            foreach (Transform wall in walls)
+            {
+                if (wall == null)
+                {
+                    continue;
+                }
+
+                StabilizeWallRigidbody(wall);
+
+                if (addBlockingColliderForTriggerWalls)
+                {
+                    EnsureBlockingCollider(wall);
+                }
+            }
+        }
+
+        private void StabilizeWallRigidbody(Transform wall)
+        {
+            Rigidbody rb = wall.GetComponent<Rigidbody>();
+            if (rb == null)
+            {
+                return;
+            }
+
+            if (forceKinematicRigidbody)
+            {
+                rb.isKinematic = true;
+            }
+
+            rb.useGravity = false;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+
+            if (freezeWallRotation)
+            {
+                rb.constraints |= RigidbodyConstraints.FreezeRotationX
+                    | RigidbodyConstraints.FreezeRotationY
+                    | RigidbodyConstraints.FreezeRotationZ;
+            }
+        }
+
+        private void EnsureBlockingCollider(Transform wall)
+        {
+            Collider[] colliders = wall.GetComponents<Collider>();
+            if (colliders == null || colliders.Length == 0)
+            {
+                return;
+            }
+
+            bool hasSolidCollider = false;
+            BoxCollider triggerBoxCollider = null;
+            Collider firstEnabledCollider = null;
+
+            foreach (Collider collider in colliders)
+            {
+                if (collider == null || !collider.enabled)
+                {
+                    continue;
+                }
+
+                if (firstEnabledCollider == null)
+                {
+                    firstEnabledCollider = collider;
+                }
+
+                if (collider.isTrigger)
+                {
+                    if (triggerBoxCollider == null && collider is BoxCollider boxCollider)
+                    {
+                        triggerBoxCollider = boxCollider;
+                    }
+
+                    continue;
+                }
+
+                hasSolidCollider = true;
+                break;
+            }
+
+            if (hasSolidCollider)
+            {
+                return;
+            }
+
+            if (triggerBoxCollider != null)
+            {
+                BoxCollider blocker = wall.gameObject.AddComponent<BoxCollider>();
+                blocker.center = triggerBoxCollider.center;
+                blocker.size = triggerBoxCollider.size;
+                blocker.sharedMaterial = triggerBoxCollider.sharedMaterial;
+                blocker.contactOffset = triggerBoxCollider.contactOffset;
+                blocker.isTrigger = false;
+                return;
+            }
+
+            if (firstEnabledCollider != null)
+            {
+                firstEnabledCollider.isTrigger = false;
+            }
+        }
+
+        private void MoveWall(Transform wall, Vector3 worldDelta)
+        {
+            Rigidbody rb = wall.GetComponent<Rigidbody>();
+            if (rb != null && rb.isKinematic)
+            {
+                rb.MovePosition(rb.position + worldDelta);
+                return;
+            }
+
+            wall.Translate(worldDelta, Space.World);
         }
     }
 }

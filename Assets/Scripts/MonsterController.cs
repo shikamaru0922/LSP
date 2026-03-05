@@ -75,6 +75,20 @@ namespace LSP.Gameplay
         [SerializeField]
         private Animator animator;
 
+        [Header("Facing")]
+        [Tooltip("Rotate monster manually toward movement/target direction.")]
+        [SerializeField]
+        private bool useManualFacing = true;
+
+        [Tooltip("Turn speed used by manual facing (degrees/second).")]
+        [Min(0f)]
+        [SerializeField]
+        private float manualFacingTurnSpeed = 540f;
+
+        [Tooltip("Use animator transform as visual facing reference.")]
+        [SerializeField]
+        private bool useAnimatorFacingReference = true;
+
         [Tooltip("Name of the walking state used when the monster is moving.")]
         [SerializeField]
         private string walkingStateName = "walking";
@@ -134,6 +148,11 @@ namespace LSP.Gameplay
         [Tooltip("Scene loaded after the player is caught. If empty the active scene reloads.")]
         [SerializeField]
         private string postEncounterSceneName;
+
+        [Tooltip("Extra delay in seconds before loading the post-encounter scene after the player is killed.")]
+        [Min(0f)]
+        [SerializeField]
+        private float postEncounterSceneDelay = 0f;
 
         [Tooltip("Fallback speed used when the monster is moved directly because the NavMeshAgent is unavailable.")]
         [SerializeField]
@@ -225,6 +244,8 @@ namespace LSP.Gameplay
             {
                 navMeshAgent.speed = Mathf.Max(0f, fallbackMoveSpeed);
             }
+
+            ConfigureNavMeshRotationControl();
 
             timeSinceLastSeen = visionHoldDuration;
             desiredMoveSpeed = Mathf.Max(0f, fallbackMoveSpeed);
@@ -336,6 +357,11 @@ namespace LSP.Gameplay
             CheckForProximityRestart();
             UpdateFootstepAudio(CalculateCurrentSpeed(deltaTime));
             previousPosition = transform.position;
+        }
+
+        private void LateUpdate()
+        {
+            UpdateFacing(Time.deltaTime);
         }
 
         private void UpdateStateFromVision(float deltaTime)
@@ -833,6 +859,7 @@ namespace LSP.Gameplay
         public void SetNavMeshAgent(NavMeshAgent agent)
         {
             navMeshAgent = agent;
+            ConfigureNavMeshRotationControl();
 
             if (navMeshAgent != null)
             {
@@ -1060,6 +1087,104 @@ namespace LSP.Gameplay
             }
         }
 
+        private void ConfigureNavMeshRotationControl()
+        {
+            if (navMeshAgent == null)
+            {
+                return;
+            }
+
+            navMeshAgent.updateRotation = !useManualFacing;
+        }
+
+        private void UpdateFacing(float deltaTime)
+        {
+            if (!useManualFacing || currentState == MonsterState.Dead || isMoveSpeedFrozen)
+            {
+                return;
+            }
+
+            if (currentState != MonsterState.Chasing && currentState != MonsterState.Returning)
+            {
+                return;
+            }
+
+            if (!TryGetDesiredFacingDirection(out Vector3 desiredDirection))
+            {
+                return;
+            }
+
+            Vector3 referenceForward = GetFacingReferenceForward();
+            referenceForward.y = 0f;
+            if (referenceForward.sqrMagnitude <= 0.0001f)
+            {
+                referenceForward = transform.forward;
+                referenceForward.y = 0f;
+            }
+
+            if (referenceForward.sqrMagnitude <= 0.0001f)
+            {
+                return;
+            }
+
+            referenceForward.Normalize();
+            float signedAngle = Vector3.SignedAngle(referenceForward, desiredDirection, Vector3.up);
+            float maxStep = Mathf.Max(0f, manualFacingTurnSpeed) * Mathf.Max(0f, deltaTime);
+            float clampedStep = Mathf.Clamp(signedAngle, -maxStep, maxStep);
+
+            if (Mathf.Abs(clampedStep) > 0.01f)
+            {
+                transform.Rotate(0f, clampedStep, 0f, Space.World);
+            }
+        }
+
+        private bool TryGetDesiredFacingDirection(out Vector3 desiredDirection)
+        {
+            desiredDirection = Vector3.zero;
+
+            if (currentState == MonsterState.Chasing)
+            {
+                if (IsNavMeshAgentReady && navMeshAgent.desiredVelocity.sqrMagnitude > 0.0001f)
+                {
+                    desiredDirection = navMeshAgent.desiredVelocity;
+                }
+                else if (chaseTarget != null)
+                {
+                    desiredDirection = chaseTarget.position - transform.position;
+                }
+            }
+            else if (currentState == MonsterState.Returning)
+            {
+                if (IsNavMeshAgentReady && navMeshAgent.desiredVelocity.sqrMagnitude > 0.0001f)
+                {
+                    desiredDirection = navMeshAgent.desiredVelocity;
+                }
+                else
+                {
+                    desiredDirection = spawnPosition - transform.position;
+                }
+            }
+
+            desiredDirection.y = 0f;
+            if (desiredDirection.sqrMagnitude <= 0.0001f)
+            {
+                return false;
+            }
+
+            desiredDirection.Normalize();
+            return true;
+        }
+
+        private Vector3 GetFacingReferenceForward()
+        {
+            if (useAnimatorFacingReference && animator != null)
+            {
+                return animator.transform.forward;
+            }
+
+            return transform.forward;
+        }
+
         private void ApplyAnimatorMovementState()
         {
             if (animator == null)
@@ -1181,14 +1306,20 @@ namespace LSP.Gameplay
                 return;
             }
 
+            var deathSequence = player.GetComponent<PlayerExecutionDeathSequence>()
+                ?? player.GetComponentInChildren<PlayerExecutionDeathSequence>();
+
             if (!string.IsNullOrWhiteSpace(postEncounterSceneName))
             {
-                var deathSequence = player.GetComponent<PlayerExecutionDeathSequence>()
-                    ?? player.GetComponentInChildren<PlayerExecutionDeathSequence>();
                 if (deathSequence != null)
                 {
                     deathSequence.OverrideSceneToLoad(postEncounterSceneName);
                 }
+            }
+
+            if (deathSequence != null)
+            {
+                deathSequence.OverrideSceneLoadDelay(postEncounterSceneDelay);
             }
 
             player.Kill();
@@ -1418,12 +1549,15 @@ namespace LSP.Gameplay
             returnDistanceThreshold = Mathf.Max(0f, returnDistanceThreshold);
             walkingTransitionDuration = Mathf.Max(0f, walkingTransitionDuration);
             proximityRestartDistance = Mathf.Max(0f, proximityRestartDistance);
+            postEncounterSceneDelay = Mathf.Max(0f, postEncounterSceneDelay);
+            manualFacingTurnSpeed = Mathf.Max(0f, manualFacingTurnSpeed);
 
             if (animator == null)
             {
                 animator = GetComponentInChildren<Animator>();
             }
 
+            ConfigureNavMeshRotationControl();
             CacheAnimatorAnimationConfiguration();
             CacheDissolveHeightPropertyId();
         }
