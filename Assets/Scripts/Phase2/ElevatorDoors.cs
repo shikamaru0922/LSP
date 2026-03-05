@@ -31,11 +31,17 @@ public class ElevatorDoors : MonoBehaviour
     [Tooltip("当电梯门完全打开后触发 (比如用来加载下一关)")]
     public UnityEvent onFullyOpened;
 
+    [Tooltip("当电梯门完全关闭后触发")]
+    public UnityEvent onFullyClosed;
+
     // 内部记录原始位置
     private Vector3 _leftClosedPos;
     private Vector3 _rightClosedPos;
     private bool _isOpen = false;
     private Coroutine _moveCoroutine;
+    public bool IsOpen => _isOpen;
+    public bool IsMoving => _moveCoroutine != null;
+    public float EstimatedMoveDuration => slideDistance / Mathf.Max(0.01f, openSpeed);
 
     private void Start()
     {
@@ -68,18 +74,27 @@ public class ElevatorDoors : MonoBehaviour
     // =========================================================
     public void OpenElevator()
     {
-        if (_isOpen) return; // 已经是开着的，就不管了
-
+        if (_isOpen && _moveCoroutine == null) return; // 已经开着且没有在运动
         Debug.Log("【电梯】正在开门...");
-        StartCoroutine(MoveDoorsProcess(true));
+        StartDoorMove(true);
     }
 
     public void CloseElevator()
     {
-        if (!_isOpen) return; // 已经是关着的
-
+        if (!_isOpen && _moveCoroutine == null) return; // 已经关着且没有在运动
         Debug.Log("【电梯】正在关门...");
-        StartCoroutine(MoveDoorsProcess(false));
+        StartDoorMove(false);
+    }
+
+    private void StartDoorMove(bool open)
+    {
+        if (_moveCoroutine != null)
+        {
+            StopCoroutine(_moveCoroutine);
+            _moveCoroutine = null;
+        }
+
+        _moveCoroutine = StartCoroutine(MoveDoorsProcess(open));
     }
 
     // =========================================================
@@ -87,9 +102,6 @@ public class ElevatorDoors : MonoBehaviour
     // =========================================================
     private IEnumerator MoveDoorsProcess(bool open)
     {
-        // 如果正在动，先停下
-        if (_moveCoroutine != null) StopCoroutine(_moveCoroutine);
-        
         _isOpen = open;
 
         // 播放音效
@@ -98,7 +110,7 @@ public class ElevatorDoors : MonoBehaviour
 
         float timer = 0f;
         // 计算需要的总时间 = 距离 / 速度
-        float duration = slideDistance / openSpeed; 
+        float duration = EstimatedMoveDuration;
 
         // 获取当前进度 (0=关, 1=开)
         // 这里的计算稍微简化，假设每次都从头开始平滑过渡
@@ -120,11 +132,16 @@ public class ElevatorDoors : MonoBehaviour
 
         // 强制设置到终点，消除误差
         SetDoorPositions(endFactor);
+        _moveCoroutine = null;
 
         // 如果是开门，触发完成事件
         if (open)
         {
             onFullyOpened?.Invoke();
+        }
+        else
+        {
+            onFullyClosed?.Invoke();
         }
     }
 

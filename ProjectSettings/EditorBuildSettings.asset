@@ -11,9 +11,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/ZacheryScene/ZacheryScene.unity
     guid: 8d380e019b1e12a49a938df51a82f2ca
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Shikamaru_TestLevel/Level_Phase2.unity
     guid: 63ae3b8a723e9654e8d274f7286e5394
+  - enabled: 1
+    path: Assets/Scenes/ZacheryScene/Remake_Phase3.unity
+    guid: 3eff5ead036af414fa7113f94d5bb85c
   - enabled: 0
     path: Assets/Scenes/UIScene/Start.unity
     guid: 11d2455e300ae714d916ecce9a1b263e
