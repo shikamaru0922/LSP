@@ -629,7 +629,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: ebccc35cc28ae604e8f21fc1f3e51563, type: 3}
+  m_Sprite: {fileID: 21300000, guid: d1d069913d0233445bfa3e579a11e21b, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1154,7 +1154,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: ebccc35cc28ae604e8f21fc1f3e51563, type: 3}
+  m_Sprite: {fileID: 21300000, guid: bdc4c779986b5e849b4b4e791fda408e, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2249,6 +2249,15 @@ MonoBehaviour:
   wetnessSlider: {fileID: 0}
   eyeControl: {fileID: 0}
   useNormalisedValue: 0
+  syncEyeBlinkVisual: 1
+  eyeStateImage: {fileID: 879486034636116378}
+  bloodshotOverlayImage: {fileID: 2589342911734047091}
+  openEyeSprite: {fileID: 21300000, guid: d1d069913d0233445bfa3e579a11e21b, type: 3}
+  closedEyeSprite: {fileID: 21300000, guid: bee8d3f87f4be8a4f8d4caf132aea473, type: 3}
+  bloodshotSprite: {fileID: 21300000, guid: bdc4c779986b5e849b4b4e791fda408e, type: 3}
+  showBloodshotOnForcedBlink: 1
+  showBloodshotOnWarningBlink: 1
+  autoDiscoverEyeImages: 1
 --- !u!1 &5612211281503456350
 GameObject:
   m_ObjectHideFlags: 0
