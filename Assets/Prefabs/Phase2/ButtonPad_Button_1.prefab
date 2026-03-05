@@ -239,9 +239,18 @@ MonoBehaviour:
   hoverEmissionColor: {r: 0.3, g: 0.6, b: 1.5, a: 1.5}
   activeEmissionColor: {r: 0, g: 1.4, b: 3.5, a: 3.5}
   solvedEmissionColor: {r: 0, g: 3, b: 0, a: 3}
+  idleTintColor: {r: 1, g: 0.75, b: 0.35, a: 1}
+  hoverTintColor: {r: 0.55, g: 0.75, b: 1, a: 1}
+  activeTintColor: {r: 0.2, g: 0.55, b: 1, a: 1}
+  solvedTintColor: {r: 0.2, g: 1, b: 0.2, a: 1}
   hoverTweenDuration: 0.2
   hoverScaleMultiplier: 1.1
   clickPunchStrength: 0.15
   clickPunchDuration: 0.25
   clickPunchVibrato: 8
   clickPunchElasticity: 0.75
+  useCenterRayInteraction: 1
+  interactionRayDistance: 10
+  interactionLayers:
+    serializedVersion: 2
+    m_Bits: -5

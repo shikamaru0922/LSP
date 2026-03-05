@@ -12,6 +12,8 @@ namespace LSP.Puzzles
     public class GridCube : MonoBehaviour
     {
         private static readonly int EmissionColorProperty = Shader.PropertyToID("_EmissionColor");
+        private static readonly int BaseColorProperty = Shader.PropertyToID("_BaseColor");
+        private static readonly int ColorProperty = Shader.PropertyToID("_Color");
 
         [SerializeField]
         [Tooltip("Renderer used to display the cube's current color. Defaults to the first Renderer found on the object or its children.")]
@@ -37,6 +39,20 @@ namespace LSP.Puzzles
         [ColorUsage(false, true)]
         [Tooltip("Emission when the puzzle is solved (Bright Green).")]
         private Color solvedEmissionColor = new Color(0f, 1f, 0f, 1f) * 3f; // Bright green
+
+        [Header("Tint Colors (Build Fallback)")]
+        [SerializeField]
+        [Tooltip("Base color fallback when emission variants are unavailable in build.")]
+        private Color idleTintColor = new Color(1f, 0.75f, 0.35f, 1f);
+
+        [SerializeField]
+        private Color hoverTintColor = new Color(0.55f, 0.75f, 1f, 1f);
+
+        [SerializeField]
+        private Color activeTintColor = new Color(0.2f, 0.55f, 1f, 1f);
+
+        [SerializeField]
+        private Color solvedTintColor = new Color(0.2f, 1f, 0.2f, 1f);
 
         [Header("Feedback Settings")]
         [SerializeField]
@@ -64,6 +80,20 @@ namespace LSP.Puzzles
         [Tooltip("Elasticity of the click punch scale effect.")]
         private float clickPunchElasticity = 0.75f;
 
+        [Header("Interaction Detection")]
+        [SerializeField]
+        [Tooltip("Use center-ray interaction (more reliable in builds/FPS cursor lock) instead of legacy OnMouse callbacks.")]
+        private bool useCenterRayInteraction = true;
+
+        [SerializeField]
+        [Tooltip("Max distance for center-ray interaction.")]
+        [Min(0.1f)]
+        private float interactionRayDistance = 10f;
+
+        [SerializeField]
+        [Tooltip("Layers that can be hit by the interaction ray.")]
+        private LayerMask interactionLayers = Physics.DefaultRaycastLayers;
+
         private readonly List<GridCube> neighbours = new List<GridCube>(4);
         private MaterialPropertyBlock propertyBlock;
         private GridPuzzleManager owner;
@@ -73,6 +103,7 @@ namespace LSP.Puzzles
         private Tween hoverTween;
         private Tween clickTween;
         private bool isHovered;
+        private Camera interactionCamera;
 
         /// <summary>
         /// Current cube state. True when the cube is active.
@@ -93,7 +124,49 @@ namespace LSP.Puzzles
 
             propertyBlock = new MaterialPropertyBlock();
             initialScale = transform.localScale;
+            interactionCamera = Camera.main;
             UpdateVisuals();
+        }
+
+        private void Update()
+        {
+            if (!useCenterRayInteraction)
+            {
+                return;
+            }
+
+            Camera cam = ResolveInteractionCamera();
+            if (cam == null)
+            {
+                if (isHovered)
+                {
+                    isHovered = false;
+                    ResetHoverFeedback();
+                    UpdateVisuals();
+                }
+
+                return;
+            }
+
+            bool hoveredNow = IsHoveredByCenterRay(cam);
+
+            if (hoveredNow && !isHovered)
+            {
+                isHovered = true;
+                PlayHoverFeedback();
+                UpdateVisuals();
+            }
+            else if (!hoveredNow && isHovered)
+            {
+                isHovered = false;
+                ResetHoverFeedback();
+                UpdateVisuals();
+            }
+
+            if (hoveredNow && Input.GetMouseButtonDown(0))
+            {
+                ActivateCube();
+            }
         }
 
         /// <summary>
@@ -157,13 +230,21 @@ namespace LSP.Puzzles
 
         private void OnMouseDown()
         {
-            if (isSolved) return; // Prevent interaction when solved? User didn't specify, but usually good practice.
-            PlayClickFeedback();
-            owner?.HandleCubeActivated(this);
+            if (useCenterRayInteraction)
+            {
+                return;
+            }
+
+            ActivateCube();
         }
 
         private void OnMouseEnter()
         {
+            if (useCenterRayInteraction)
+            {
+                return;
+            }
+
             isHovered = true;
             PlayHoverFeedback();
             UpdateVisuals();
@@ -171,6 +252,11 @@ namespace LSP.Puzzles
 
         private void OnMouseExit()
         {
+            if (useCenterRayInteraction)
+            {
+                return;
+            }
+
             isHovered = false;
             ResetHoverFeedback();
             UpdateVisuals();
@@ -193,22 +279,27 @@ namespace LSP.Puzzles
 
             // Priority: Solved > Active > Hover > Idle
             Color targetEmission;
+            Color targetTint;
 
             if (isSolved)
             {
                 targetEmission = solvedEmissionColor;
+                targetTint = solvedTintColor;
             }
             else if (isActive)
             {
                 targetEmission = activeEmissionColor;
+                targetTint = activeTintColor;
             }
             else if (isHovered)
             {
                 targetEmission = hoverEmissionColor;
+                targetTint = hoverTintColor;
             }
             else
             {
                 targetEmission = idleEmissionColor;
+                targetTint = idleTintColor;
             }
 
             if (propertyBlock == null)
@@ -217,7 +308,26 @@ namespace LSP.Puzzles
             }
 
             targetRenderer.GetPropertyBlock(propertyBlock);
-            propertyBlock.SetColor(EmissionColorProperty, targetEmission);
+
+            Material sharedMaterial = targetRenderer.sharedMaterial;
+            if (sharedMaterial != null)
+            {
+                if (sharedMaterial.HasProperty(EmissionColorProperty))
+                {
+                    propertyBlock.SetColor(EmissionColorProperty, targetEmission);
+                }
+
+                if (sharedMaterial.HasProperty(BaseColorProperty))
+                {
+                    propertyBlock.SetColor(BaseColorProperty, targetTint);
+                }
+
+                if (sharedMaterial.HasProperty(ColorProperty))
+                {
+                    propertyBlock.SetColor(ColorProperty, targetTint);
+                }
+            }
+
             targetRenderer.SetPropertyBlock(propertyBlock);
         }
 
@@ -255,6 +365,53 @@ namespace LSP.Puzzles
                         ResetHoverFeedback();
                     }
                 });
+        }
+
+        private void ActivateCube()
+        {
+            if (isSolved)
+            {
+                return;
+            }
+
+            PlayClickFeedback();
+            owner?.HandleCubeActivated(this);
+        }
+
+        private Camera ResolveInteractionCamera()
+        {
+            if (interactionCamera != null && interactionCamera.isActiveAndEnabled)
+            {
+                return interactionCamera;
+            }
+
+            interactionCamera = Camera.main;
+            if (interactionCamera != null && interactionCamera.isActiveAndEnabled)
+            {
+                return interactionCamera;
+            }
+
+            interactionCamera = FindObjectOfType<Camera>();
+            return interactionCamera != null && interactionCamera.isActiveAndEnabled
+                ? interactionCamera
+                : null;
+        }
+
+        private bool IsHoveredByCenterRay(Camera cam)
+        {
+            Ray ray = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            if (!Physics.Raycast(ray, out RaycastHit hit, interactionRayDistance, interactionLayers, QueryTriggerInteraction.Ignore))
+            {
+                return false;
+            }
+
+            Transform hitTransform = hit.collider != null ? hit.collider.transform : null;
+            if (hitTransform == null)
+            {
+                return false;
+            }
+
+            return hitTransform == transform || hitTransform.IsChildOf(transform);
         }
     }
 }
