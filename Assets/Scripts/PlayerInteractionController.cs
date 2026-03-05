@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using LSP.Gameplay.Interactions;
 
 namespace LSP.Gameplay
@@ -20,11 +21,33 @@ namespace LSP.Gameplay
 
         [SerializeField]
         [Tooltip("Maximum distance from the camera that the player can interact with objects.")]
-        private float interactionDistance = 1f;
+        [Min(0f)]
+        private float interactionDistance = 2f;
 
         [SerializeField]
         [Tooltip("Physics layers considered valid when searching for interactables.")]
         private LayerMask interactableLayers = ~0;
+
+        [Header("Interaction Feedback")]
+        [SerializeField]
+        [Tooltip("Optional UI graphic used as the center crosshair. Its color changes when an interactable is in focus.")]
+        private Graphic crosshairGraphic;
+
+        [SerializeField]
+        [Tooltip("Default color applied to the crosshair when no interactable is targeted.")]
+        private Color defaultCrosshairColor = Color.white;
+
+        [SerializeField]
+        [Tooltip("Color applied to the crosshair while aiming at a valid interactable.")]
+        private Color interactableCrosshairColor = Color.green;
+
+        [SerializeField]
+        [Tooltip("If enabled, the default crosshair color is captured from the assigned graphic during Awake.")]
+        private bool captureDefaultCrosshairColorOnAwake = true;
+
+        [SerializeField]
+        [Tooltip("Optional UI object shown when the player can interact (for example, a Press F icon).")]
+        private GameObject interactPromptObject;
 
         [Header("Carrying")]
         [SerializeField]
@@ -47,6 +70,7 @@ namespace LSP.Gameplay
         private InteractableItem carriedItem;
         private bool uiOpen;
         private int pendingDisablerFragments;
+        private bool feedbackActive;
 
         /// <summary>
         /// Gets or sets a value indicating whether the player's interaction input is currently blocked by UI.
@@ -114,12 +138,19 @@ namespace LSP.Gameplay
                 }
             }
 
+            if (crosshairGraphic != null && captureDefaultCrosshairColorOnAwake)
+            {
+                defaultCrosshairColor = crosshairGraphic.color;
+            }
+
+            SetInteractionFeedback(false, true);
         }
 
         private void OnDisable()
         {
             ClearFocus();
             DropCarriedItem();
+            SetInteractionFeedback(false, true);
         }
 
         private void Update()
@@ -291,11 +322,33 @@ namespace LSP.Gameplay
             }
 
             currentInteractable = interactable;
+            SetInteractionFeedback(true);
         }
 
         private void ClearFocus()
         {
             currentInteractable = null;
+            SetInteractionFeedback(false);
+        }
+
+        private void SetInteractionFeedback(bool hasInteractableFocus, bool force = false)
+        {
+            if (!force && feedbackActive == hasInteractableFocus)
+            {
+                return;
+            }
+
+            feedbackActive = hasInteractableFocus;
+
+            if (crosshairGraphic != null)
+            {
+                crosshairGraphic.color = hasInteractableFocus ? interactableCrosshairColor : defaultCrosshairColor;
+            }
+
+            if (interactPromptObject != null)
+            {
+                interactPromptObject.SetActive(hasInteractableFocus);
+            }
         }
     }
 }
