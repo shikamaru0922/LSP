@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.AI;
 
 namespace MuseumGame.Interaction
 {
@@ -41,6 +42,16 @@ namespace MuseumGame.Interaction
         [Header("Events")]
         [SerializeField] private UnityEvent _onOpened;
         [SerializeField] private UnityEvent _onUnlockSuccess;
+
+        [Header("NavMesh Obstacle (可选)")]
+        [Tooltip("关闭时启用障碍切断通路，打开时关闭障碍恢复通路。为空时可自动在自己和子物体中查找。")]
+        [SerializeField] private NavMeshObstacle[] _navMeshObstacles;
+
+        [Tooltip("当未手动指定障碍列表时，自动在自己和子物体中查找 NavMeshObstacle。")]
+        [SerializeField] private bool _autoResolveNavMeshObstacles = true;
+
+        [Tooltip("门关闭并切路时，强制将 NavMeshObstacle 的 Carve 打开，确保真正切断导航网格。")]
+        [SerializeField] private bool _forceCarveWhenBlocking = true;
 
         private bool _isOpen;
         private bool _isLocked;
@@ -85,6 +96,8 @@ namespace MuseumGame.Interaction
 
             // 应用初始角度
             UpdateDoorRotation(_currentDoorAngle);
+            ResolveNavMeshObstaclesIfNeeded();
+            ApplyNavMeshObstacleState(!_isOpen);
 
             if (_doorHandle != null) _doorHandle.localRotation = Quaternion.Euler(_handleUpRotation);
         }
@@ -149,6 +162,7 @@ namespace MuseumGame.Interaction
             
             UpdateDoorRotation(_currentDoorAngle);
             if(_doorHandle != null) _doorHandle.localRotation = Quaternion.Euler(_handleUpRotation);
+            ApplyNavMeshObstacleState(true);
             PlayClip(_lockedSfx);
         }
 
@@ -172,6 +186,7 @@ namespace MuseumGame.Interaction
         private IEnumerator CloseSequence()
         {
             _openRoutine = StartCoroutine(DoNothing());
+            ApplyNavMeshObstacleState(true);
 
             // 设置目标为关闭角度
             _targetDoorAngle = _closedAngle;
@@ -218,6 +233,7 @@ namespace MuseumGame.Interaction
 
             _isOpen = true;
             _targetDoorAngle = _openAngle;
+            ApplyNavMeshObstacleState(false);
             PlayClip(_openSfx);
             _onOpened?.Invoke();
             
@@ -231,6 +247,8 @@ namespace MuseumGame.Interaction
                 // 但为了双重保险，我们检查一下，如果它没隐藏，我们这里强制隐藏
                
             }
+
+            DisableLocalBlinkHighlight();
             
 
             // 把手回弹
@@ -261,6 +279,65 @@ namespace MuseumGame.Interaction
         private void PlayClip(AudioClip clip)
         {
             if (clip != null && _audioSource != null) _audioSource.PlayOneShot(clip);
+        }
+
+        private void ResolveNavMeshObstaclesIfNeeded()
+        {
+            if (!_autoResolveNavMeshObstacles)
+            {
+                return;
+            }
+
+            if (_navMeshObstacles != null && _navMeshObstacles.Length > 0)
+            {
+                return;
+            }
+
+            _navMeshObstacles = GetComponentsInChildren<NavMeshObstacle>(true);
+        }
+
+        private void ApplyNavMeshObstacleState(bool shouldBlockPath)
+        {
+            ResolveNavMeshObstaclesIfNeeded();
+
+            if (_navMeshObstacles == null || _navMeshObstacles.Length == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < _navMeshObstacles.Length; i++)
+            {
+                NavMeshObstacle obstacle = _navMeshObstacles[i];
+                if (obstacle == null)
+                {
+                    continue;
+                }
+
+                obstacle.enabled = shouldBlockPath;
+                if (shouldBlockPath && _forceCarveWhenBlocking)
+                {
+                    obstacle.carving = true;
+                }
+            }
+        }
+
+        private void DisableLocalBlinkHighlight()
+        {
+            BlinkObject[] blinkObjects = GetComponentsInChildren<BlinkObject>(true);
+            if (blinkObjects == null || blinkObjects.Length == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < blinkObjects.Length; i++)
+            {
+                if (blinkObjects[i] == null)
+                {
+                    continue;
+                }
+
+                blinkObjects[i].SetAsCurrentTarget(false);
+            }
         }
     }
 }

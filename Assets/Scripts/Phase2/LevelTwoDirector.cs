@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
@@ -20,6 +21,8 @@ public class GameFlag
 
 public class LevelTwoDirector : MonoBehaviour
 {
+    private const string LegacyPhase3SceneName = "Level_Phase3";
+    private const string RemakePhase3SceneName = "Remake_Phase3";
     public static LevelTwoDirector Instance;
 
     [Header("===== 所有的游戏开关 (Flags) =====")]
@@ -37,7 +40,7 @@ public class LevelTwoDirector : MonoBehaviour
     [SerializeField] private string levelCompleteFlagName = "LevelComplete";
 
     [Tooltip("要异步预加载并切换的目标场景名。")]
-    [SerializeField] private string phase3SceneName = "Remake_Phase3";
+    [SerializeField] private string phase3SceneName = RemakePhase3SceneName;
 
     [Tooltip("LevelComplete 触发后，延迟多少秒再执行关门。")]
     [Min(0f)]
@@ -87,6 +90,7 @@ public class LevelTwoDirector : MonoBehaviour
             }
         }
 
+        NormalizePhase3SceneName();
         ResolveTransitionReferences();
     }
 
@@ -240,6 +244,8 @@ public class LevelTwoDirector : MonoBehaviour
 
     private void StartPhase3Preload()
     {
+        NormalizePhase3SceneName();
+
         if (preloadStarted || string.IsNullOrWhiteSpace(phase3SceneName))
         {
             return;
@@ -319,6 +325,7 @@ public class LevelTwoDirector : MonoBehaviour
         }
 
         transitionTriggered = true;
+        NormalizePhase3SceneName();
 
         if (forceBlinkBeforeTransition)
         {
@@ -354,12 +361,27 @@ public class LevelTwoDirector : MonoBehaviour
         }
     }
 
+    private void NormalizePhase3SceneName()
+    {
+        if (string.IsNullOrWhiteSpace(phase3SceneName))
+        {
+            phase3SceneName = RemakePhase3SceneName;
+            return;
+        }
+
+        if (string.Equals(phase3SceneName, LegacyPhase3SceneName, StringComparison.OrdinalIgnoreCase))
+        {
+            phase3SceneName = RemakePhase3SceneName;
+        }
+    }
+
 #if UNITY_EDITOR
     private void OnValidate()
     {
         delayBeforeCloseDoor = Mathf.Max(0f, delayBeforeCloseDoor);
         delayAfterBlink = Mathf.Max(0f, delayAfterBlink);
         doorCloseTimeoutPadding = Mathf.Max(0f, doorCloseTimeoutPadding);
+        NormalizePhase3SceneName();
     }
 #endif
 }

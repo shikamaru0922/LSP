@@ -973,6 +973,21 @@ MonoBehaviour:
   interactableLayers:
     serializedVersion: 2
     m_Bits: 4294967295
+  crosshairGraphic: {fileID: 0}
+  useCrosshairColorFeedback: 0
+  useCrosshairSpriteFeedback: 1
+  defaultCrosshairColor: {r: 1, g: 1, b: 1, a: 1}
+  interactableCrosshairColor: {r: 0, g: 1, b: 0, a: 1}
+  captureDefaultCrosshairColorOnAwake: 0
+  interactPromptObject: {fileID: 0}
+  idleCrosshairSprite: {fileID: 0}
+  interactableCrosshairSprite: {fileID: 21300000, guid: 7e03312479fe52e48a075db141c48ee8, type: 3}
+  pressedInteractableCrosshairSprite: {fileID: 21300000, guid: 8cc5d57bdc151f6489c077768e38cf8d,
+    type: 3}
+  focusedCrosshairScaleMultiplier: 7
+  interactPromptIdleObject: {fileID: 0}
+  autoResolvePromptObjects: 0
+  createFallbackPromptWhenMissing: 0
   carryAnchor: {fileID: 6346815865917767754}
   eyeControl: {fileID: 8295824941862038216}
   disablerDevice: {fileID: 0}

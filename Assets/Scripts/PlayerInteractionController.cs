@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using LSP.Gameplay.Interactions;
@@ -34,6 +35,14 @@ namespace LSP.Gameplay
         private Graphic crosshairGraphic;
 
         [SerializeField]
+        [Tooltip("If enabled, the crosshair color changes when an interactable is in focus.")]
+        private bool useCrosshairColorFeedback = false;
+
+        [SerializeField]
+        [Tooltip("If enabled, the crosshair swaps between idle/interaction sprites.")]
+        private bool useCrosshairSpriteFeedback = true;
+
+        [SerializeField]
         [Tooltip("Default color applied to the crosshair when no interactable is targeted.")]
         private Color defaultCrosshairColor = Color.white;
 
@@ -48,6 +57,35 @@ namespace LSP.Gameplay
         [SerializeField]
         [Tooltip("Optional UI object shown when the player can interact (for example, a Press F icon).")]
         private GameObject interactPromptObject;
+
+        [SerializeField]
+        [Tooltip("Idle crosshair sprite (for example, F.png).")]
+        private Sprite idleCrosshairSprite;
+
+        [SerializeField]
+        [Tooltip("Interactable crosshair sprite (for example, F_onclick.png).")]
+        private Sprite interactableCrosshairSprite;
+
+        [SerializeField]
+        [Tooltip("Crosshair sprite shown while holding the interaction key on a valid target.")]
+        private Sprite pressedInteractableCrosshairSprite;
+
+        [SerializeField]
+        [Tooltip("How much larger the focused F prompt should be than the idle dot.")]
+        [Min(1f)]
+        private float focusedCrosshairScaleMultiplier = 7f;
+
+        [SerializeField]
+        [Tooltip("Optional UI object shown while there is no interactable focus (for example, an idle F icon).")]
+        private GameObject interactPromptIdleObject;
+
+        [SerializeField]
+        [Tooltip("If enabled, the controller tries to auto-locate F prompt UI objects by name when fields are unassigned.")]
+        private bool autoResolvePromptObjects = false;
+
+        [SerializeField]
+        [Tooltip("If no prompt object can be found, create a simple runtime F text prompt so interaction feedback still works.")]
+        private bool createFallbackPromptWhenMissing = false;
 
         [Header("Carrying")]
         [SerializeField]
@@ -71,6 +109,35 @@ namespace LSP.Gameplay
         private bool uiOpen;
         private int pendingDisablerFragments;
         private bool feedbackActive;
+        private bool feedbackPressed;
+        private Image cachedCrosshairImage;
+        private Vector2 defaultCrosshairSizeDelta;
+        private bool defaultCrosshairSizeCaptured;
+        private static readonly string[] ActivePromptNameTokens =
+        {
+            "fonclick",
+            "fkeyonclick",
+            "fbuttononclick",
+            "finteractactive",
+            "f键onclick",
+            "f键按下"
+        };
+
+        private static readonly string[] IdlePromptNameTokens =
+        {
+            "f",
+            "fkey",
+            "fbutton",
+            "fprompt",
+            "finteract",
+            "f键"
+        };
+
+        private static readonly string[] CrosshairRootNameTokens =
+        {
+            "corsshair",
+            "crosshair"
+        };
 
         /// <summary>
         /// Gets or sets a value indicating whether the player's interaction input is currently blocked by UI.
@@ -143,6 +210,8 @@ namespace LSP.Gameplay
                 defaultCrosshairColor = crosshairGraphic.color;
             }
 
+            ResolvePromptObjects();
+            CacheCrosshairVisualDefaults();
             SetInteractionFeedback(false, true);
         }
 
@@ -331,18 +400,293 @@ namespace LSP.Gameplay
             SetInteractionFeedback(false);
         }
 
+        private void ResolvePromptObjects()
+        {
+            TryAutoResolveCrosshairGraphic();
+
+            if (!autoResolvePromptObjects)
+            {
+                return;
+            }
+
+            if (interactPromptObject == null)
+            {
+                interactPromptObject = TryResolvePromptObject(ActivePromptNameTokens);
+            }
+
+            if (interactPromptIdleObject == null)
+            {
+                interactPromptIdleObject = TryResolvePromptObject(IdlePromptNameTokens);
+            }
+
+            if (interactPromptIdleObject == interactPromptObject)
+            {
+                interactPromptIdleObject = null;
+            }
+
+            if (interactPromptObject == null && createFallbackPromptWhenMissing)
+            {
+                interactPromptObject = CreateFallbackPromptObject();
+            }
+        }
+
+        private void TryAutoResolveCrosshairGraphic()
+        {
+            if (crosshairGraphic != null)
+            {
+                return;
+            }
+
+            Transform[] allTransforms = FindObjectsOfType<Transform>(true);
+            GameObject crosshairRoot = TryFindPromptByName(allTransforms, CrosshairRootNameTokens);
+            if (crosshairRoot == null)
+            {
+                return;
+            }
+
+            crosshairGraphic = crosshairRoot.GetComponentInChildren<Graphic>(true);
+            if (crosshairGraphic != null && captureDefaultCrosshairColorOnAwake)
+            {
+                defaultCrosshairColor = crosshairGraphic.color;
+            }
+        }
+
+        private void CacheCrosshairVisualDefaults()
+        {
+            if (!(crosshairGraphic is Image crosshairImage))
+            {
+                return;
+            }
+
+            cachedCrosshairImage = crosshairImage;
+
+            if (!defaultCrosshairSizeCaptured && crosshairImage.rectTransform != null)
+            {
+                defaultCrosshairSizeDelta = crosshairImage.rectTransform.sizeDelta;
+                defaultCrosshairSizeCaptured = true;
+            }
+
+            if (idleCrosshairSprite == null)
+            {
+                idleCrosshairSprite = crosshairImage.sprite;
+            }
+        }
+
+        private void ApplyCrosshairSize(bool focused)
+        {
+            if (!defaultCrosshairSizeCaptured || cachedCrosshairImage == null || cachedCrosshairImage.rectTransform == null)
+            {
+                return;
+            }
+
+            float multiplier = focused ? Mathf.Max(1f, focusedCrosshairScaleMultiplier) : 1f;
+            cachedCrosshairImage.rectTransform.sizeDelta = defaultCrosshairSizeDelta * multiplier;
+        }
+
+        private GameObject TryResolvePromptObject(string[] normalizedNameTokens)
+        {
+            GameObject nearCrosshair = TryFindPromptNearCrosshair(normalizedNameTokens);
+            if (nearCrosshair != null)
+            {
+                return nearCrosshair;
+            }
+
+            Transform[] allTransforms = FindObjectsOfType<Transform>(true);
+            return TryFindPromptByName(allTransforms, normalizedNameTokens);
+        }
+
+        private GameObject TryFindPromptNearCrosshair(string[] normalizedNameTokens)
+        {
+            if (crosshairGraphic == null)
+            {
+                return null;
+            }
+
+            Transform root = crosshairGraphic.transform.parent != null
+                ? crosshairGraphic.transform.parent
+                : crosshairGraphic.transform;
+
+            Transform[] transforms = root.GetComponentsInChildren<Transform>(true);
+            return TryFindPromptByName(transforms, normalizedNameTokens);
+        }
+
+        private static GameObject TryFindPromptByName(Transform[] transforms, string[] normalizedNameTokens)
+        {
+            if (transforms == null || normalizedNameTokens == null || normalizedNameTokens.Length == 0)
+            {
+                return null;
+            }
+
+            foreach (Transform candidate in transforms)
+            {
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                string normalizedCandidateName = NormalizeObjectName(candidate.name);
+                if (string.IsNullOrEmpty(normalizedCandidateName))
+                {
+                    continue;
+                }
+
+                foreach (string token in normalizedNameTokens)
+                {
+                    if (!IsNameTokenMatch(normalizedCandidateName, token))
+                    {
+                        continue;
+                    }
+
+                    return candidate.gameObject;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsNameTokenMatch(string normalizedCandidateName, string token)
+        {
+            if (string.IsNullOrEmpty(normalizedCandidateName) || string.IsNullOrEmpty(token))
+            {
+                return false;
+            }
+
+            if (normalizedCandidateName == token)
+            {
+                return true;
+            }
+
+            if (token.Length >= 6 && normalizedCandidateName.IndexOf(token, StringComparison.Ordinal) >= 0)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static string NormalizeObjectName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return string.Empty;
+            }
+
+            char[] buffer = new char[name.Length];
+            int length = 0;
+
+            foreach (char c in name)
+            {
+                if (!char.IsLetterOrDigit(c))
+                {
+                    continue;
+                }
+
+                buffer[length++] = char.ToLowerInvariant(c);
+            }
+
+            return length == 0 ? string.Empty : new string(buffer, 0, length);
+        }
+
+        private GameObject CreateFallbackPromptObject()
+        {
+            if (crosshairGraphic == null)
+            {
+                return null;
+            }
+
+            Transform parent = crosshairGraphic.transform.parent != null
+                ? crosshairGraphic.transform.parent
+                : crosshairGraphic.transform;
+
+            var prompt = new GameObject("F_Prompt_Auto", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            prompt.transform.SetParent(parent, false);
+
+            var promptRect = prompt.GetComponent<RectTransform>();
+            promptRect.anchorMin = new Vector2(0.5f, 0.5f);
+            promptRect.anchorMax = new Vector2(0.5f, 0.5f);
+            promptRect.pivot = new Vector2(0.5f, 0.5f);
+            promptRect.anchoredPosition = Vector2.zero;
+            promptRect.localScale = Vector3.one;
+
+            if (crosshairGraphic.rectTransform != null)
+            {
+                promptRect.sizeDelta = crosshairGraphic.rectTransform.sizeDelta;
+            }
+            else
+            {
+                promptRect.sizeDelta = new Vector2(100f, 100f);
+            }
+
+            var promptText = prompt.GetComponent<Text>();
+            promptText.text = interactKey.ToString().ToUpperInvariant();
+            promptText.alignment = TextAnchor.MiddleCenter;
+            promptText.color = Color.white;
+            promptText.resizeTextForBestFit = true;
+            promptText.resizeTextMinSize = 16;
+            promptText.resizeTextMaxSize = 72;
+            promptText.raycastTarget = false;
+            promptText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            if (promptText.font == null)
+            {
+                promptText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            }
+
+            prompt.SetActive(false);
+            return prompt;
+        }
+
         private void SetInteractionFeedback(bool hasInteractableFocus, bool force = false)
         {
-            if (!force && feedbackActive == hasInteractableFocus)
+            bool isInteractPressed = hasInteractableFocus && Input.GetKey(interactKey);
+
+            if (!force && feedbackActive == hasInteractableFocus && feedbackPressed == isInteractPressed)
             {
                 return;
             }
 
             feedbackActive = hasInteractableFocus;
+            feedbackPressed = isInteractPressed;
 
             if (crosshairGraphic != null)
             {
-                crosshairGraphic.color = hasInteractableFocus ? interactableCrosshairColor : defaultCrosshairColor;
+                if (cachedCrosshairImage == null)
+                {
+                    CacheCrosshairVisualDefaults();
+                }
+
+                if (useCrosshairSpriteFeedback && cachedCrosshairImage != null)
+                {
+                    Sprite targetSprite = idleCrosshairSprite;
+                    if (hasInteractableFocus)
+                    {
+                        targetSprite = isInteractPressed && pressedInteractableCrosshairSprite != null
+                            ? pressedInteractableCrosshairSprite
+                            : interactableCrosshairSprite;
+                    }
+
+                    if (targetSprite != null)
+                    {
+                        cachedCrosshairImage.sprite = targetSprite;
+                        cachedCrosshairImage.preserveAspect = true;
+                    }
+
+                    ApplyCrosshairSize(hasInteractableFocus);
+                }
+
+                if (useCrosshairColorFeedback)
+                {
+                    crosshairGraphic.color = hasInteractableFocus ? interactableCrosshairColor : defaultCrosshairColor;
+                }
+                else
+                {
+                    crosshairGraphic.color = defaultCrosshairColor;
+                }
+            }
+
+            if (interactPromptIdleObject != null && interactPromptIdleObject != interactPromptObject)
+            {
+                interactPromptIdleObject.SetActive(!hasInteractableFocus);
             }
 
             if (interactPromptObject != null)

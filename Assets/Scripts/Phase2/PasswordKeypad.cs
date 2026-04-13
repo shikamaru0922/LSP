@@ -48,6 +48,16 @@ public class PasswordKeypad : MonoBehaviour
     private bool starterInputOverrideActive;
     private bool cachedCursorLocked;
     private bool cachedCursorInputForLook;
+
+    /// <summary>
+    /// 当前密码 UI 是否处于打开状态。
+    /// </summary>
+    public bool IsOpen => isOpen;
+
+    /// <summary>
+    /// 密码锁是否已经被解开。
+    /// </summary>
+    public bool IsSolved => isSolved;
     
     void Start()
     {
@@ -62,14 +72,31 @@ public class PasswordKeypad : MonoBehaviour
         {
             starterInputs = FindObjectOfType<StarterAssetsInputs>();
         }
-        
-        // 游戏开始时隐藏密码锁
-        if(uiPanel != null) uiPanel.SetActive(false);
+
+        // 如果此脚本在首次交互时才被激活，OpenKeypad 可能先于 Start 调用。
+        // 这种情况下不能在 Start 再次强制隐藏，否则会出现“第一次按键打不开、第二次才打开”。
+        bool openedBeforeStart = isOpen || (uiPanel != null && uiPanel.activeSelf);
+        if (uiPanel != null && !openedBeforeStart)
+        {
+            uiPanel.SetActive(false);
+        }
+
+        isOpen = openedBeforeStart;
+        if (isOpen)
+        {
+            SetUiInputState(true);
+        }
         
         // 监听输入框的回车键 (Enter提交)
         if (inputField != null)
         {
             inputField.onSubmit.AddListener(OnInputSubmit);
+
+            if (isOpen)
+            {
+                inputField.Select();
+                inputField.ActivateInputField();
+            }
         }
     }
 

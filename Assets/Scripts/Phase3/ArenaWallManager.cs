@@ -50,6 +50,20 @@ namespace LSP.Gameplay
 
         private AudioSource _audioSource;
         private bool _isShrinking = false;
+        private Sequence _activeMotionSequence;
+        private int _motionVersion;
+        private float[] _baseWallY;
+        private bool _baseWallYInitialized;
+
+        private enum WallMotionState
+        {
+            Idle,
+            Rising,
+            Shrinking,
+            Descending
+        }
+
+        private WallMotionState _motionState = WallMotionState.Idle;
 
         private void Awake()
         {
@@ -61,6 +75,7 @@ namespace LSP.Gameplay
             }
 
             PrepareWallsForStableCollision();
+            CacheWallBaselineY(forceRefresh: true);
         }
 
         // =========================================================
@@ -69,6 +84,11 @@ namespace LSP.Gameplay
         public void TriggerWallsRise()
         {
             Debug.Log("【ArenaWallManager】墙壁开始升起 (DoTween驱动)！");
+            CacheWallBaselineY();
+            StopShrinking();
+            CancelActiveWallMotion();
+            _motionState = WallMotionState.Rising;
+            int motionVersion = _motionVersion;
 
             if (riseSound != null)
             {
@@ -76,20 +96,45 @@ namespace LSP.Gameplay
             }
 
             Sequence riseSequence = DOTween.Sequence();
+            _activeMotionSequence = riseSequence;
+            bool hasTween = false;
 
             for (int i = 0; i < walls.Length; i++)
             {
                 if (walls[i] != null)
                 {
-                    Vector3 targetPos = walls[i].position + new Vector3(0, riseHeight, 0);
-                    riseSequence.Join(walls[i].DOMove(targetPos, riseDuration).SetEase(riseEase));
+                    hasTween = true;
+                    float targetY = GetWallBaseY(i) + riseHeight;
+                    riseSequence.Join(walls[i].DOMoveY(targetY, riseDuration).SetEase(riseEase));
                 }
+            }
+
+            if (!hasTween)
+            {
+                _activeMotionSequence = null;
+                _motionState = WallMotionState.Idle;
+                return;
             }
 
             riseSequence.OnComplete(() => 
             {
+                if (motionVersion != _motionVersion || _motionState != WallMotionState.Rising)
+                {
+                    return;
+                }
+
                 Debug.Log("【ArenaWallManager】墙壁升起完毕，开始缩圈！");
                 _isShrinking = true;
+                _motionState = WallMotionState.Shrinking;
+                _activeMotionSequence = null;
+            });
+
+            riseSequence.OnKill(() =>
+            {
+                if (_activeMotionSequence == riseSequence)
+                {
+                    _activeMotionSequence = null;
+                }
             });
         }
 
@@ -98,7 +143,7 @@ namespace LSP.Gameplay
         // =========================================================
         private void FixedUpdate()
         {
-            if (!_isShrinking) return;
+            if (!_isShrinking || _motionState != WallMotionState.Shrinking) return;
 
             Vector3 center = centerPoint != null ? centerPoint.position : transform.position;
 
@@ -122,6 +167,12 @@ namespace LSP.Gameplay
         public void StopShrinking()
         {
             _isShrinking = false;
+
+            if (_motionState == WallMotionState.Shrinking)
+            {
+                _motionState = WallMotionState.Idle;
+            }
+
             Debug.Log("【ArenaWallManager】缩圈已停止。");
         }
 
@@ -131,9 +182,13 @@ namespace LSP.Gameplay
         public void TriggerWallsDescend()
         {
             Debug.Log("【ArenaWallManager】危机解除，墙壁开始降下！");
+            CacheWallBaselineY();
 
             // 1. 强制停止缩圈
-            _isShrinking = false;
+            StopShrinking();
+            CancelActiveWallMotion();
+            _motionState = WallMotionState.Descending;
+            int motionVersion = _motionVersion;
 
             // 2. 播放降下音效
             if (descendSound != null)
@@ -143,21 +198,37 @@ namespace LSP.Gameplay
 
             // 3. 启动降下动画序列
             Sequence descendSequence = DOTween.Sequence();
+            _activeMotionSequence = descendSequence;
+            bool hasTween = false;
 
             for (int i = 0; i < walls.Length; i++)
             {
                 if (walls[i] != null)
                 {
-                    // 仅改变 Y 轴，让它原地沉底，保持当前的 XZ 坐标不变
-                    float targetY = walls[i].position.y - riseHeight;
+                    hasTween = true;
+                    float targetY = GetWallBaseY(i);
                     descendSequence.Join(walls[i].DOMoveY(targetY, descendDuration).SetEase(descendEase));
                 }
+            }
+
+            if (!hasTween)
+            {
+                _activeMotionSequence = null;
+                _motionState = WallMotionState.Idle;
+                return;
             }
 
             // 4. 动画完成后的收尾工作
             descendSequence.OnComplete(() => 
             {
+                if (motionVersion != _motionVersion || _motionState != WallMotionState.Descending)
+                {
+                    return;
+                }
+
                 Debug.Log("【ArenaWallManager】墙壁已完全降下，场地清理完毕。");
+                _motionState = WallMotionState.Idle;
+                _activeMotionSequence = null;
                 // 如果你想让墙壁降下后彻底禁用不占用性能，可以取消下面这段注释：
                 /*
                 foreach (var wall in walls)
@@ -166,6 +237,19 @@ namespace LSP.Gameplay
                 }
                 */
             });
+
+            descendSequence.OnKill(() =>
+            {
+                if (_activeMotionSequence == descendSequence)
+                {
+                    _activeMotionSequence = null;
+                }
+            });
+        }
+
+        private void OnDestroy()
+        {
+            CancelActiveWallMotion();
         }
 
         private void PrepareWallsForStableCollision()
@@ -286,6 +370,82 @@ namespace LSP.Gameplay
             }
 
             wall.Translate(worldDelta, Space.World);
+        }
+
+        private void CacheWallBaselineY(bool forceRefresh = false)
+        {
+            if (walls == null)
+            {
+                _baseWallY = null;
+                _baseWallYInitialized = false;
+                return;
+            }
+
+            if (!forceRefresh &&
+                _baseWallYInitialized &&
+                _baseWallY != null &&
+                _baseWallY.Length == walls.Length)
+            {
+                return;
+            }
+
+            if (_baseWallY == null || _baseWallY.Length != walls.Length)
+            {
+                _baseWallY = new float[walls.Length];
+            }
+
+            for (int i = 0; i < walls.Length; i++)
+            {
+                if (walls[i] == null)
+                {
+                    continue;
+                }
+
+                _baseWallY[i] = walls[i].position.y;
+            }
+
+            _baseWallYInitialized = true;
+        }
+
+        private float GetWallBaseY(int index)
+        {
+            if (_baseWallYInitialized &&
+                _baseWallY != null &&
+                index >= 0 &&
+                index < _baseWallY.Length)
+            {
+                return _baseWallY[index];
+            }
+
+            return walls != null && index >= 0 && index < walls.Length && walls[index] != null
+                ? walls[index].position.y
+                : 0f;
+        }
+
+        private void CancelActiveWallMotion()
+        {
+            _motionVersion++;
+
+            if (_activeMotionSequence != null && _activeMotionSequence.IsActive())
+            {
+                _activeMotionSequence.Kill(false);
+                _activeMotionSequence = null;
+            }
+
+            if (walls == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < walls.Length; i++)
+            {
+                if (walls[i] == null)
+                {
+                    continue;
+                }
+
+                walls[i].DOKill(false);
+            }
         }
     }
 }

@@ -17,11 +17,23 @@ namespace LSP.Gameplay
 
         public bool CanInteract(PlayerInteractionController controller)
         {
-            // 如果门已经开了，就不需要再交互了 (或者你可以允许关门，看需求)
-            if (_targetDoor != null && _targetDoor.IsOpen) 
+            if (_targetDoor == null)
             {
-                return true; // 允许关门
+                return false;
             }
+
+            // 门已打开后，不再显示可交互高亮/提示。
+            if (_targetDoor.IsOpen)
+            {
+                return false;
+            }
+
+            // 可选：锁住时是否允许继续交互（比如播放“锁住”音效）。
+            if (_targetDoor.IsLocked && !_allowInteractWhenLocked)
+            {
+                return false;
+            }
+
             return true;
         }
 

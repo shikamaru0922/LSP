@@ -15,8 +15,13 @@ public class InteractableOpenUI : MonoBehaviour, IInteractable
     // 必须实现接口里的 CanInteract
     public bool CanInteract(PlayerInteractionController caller)
     {
-        // 只要 UI 没打开，就可以互动
-        return targetUI != null && !targetUI.gameObject.activeSelf;
+        if (targetUI == null)
+        {
+            return false;
+        }
+
+        // 只要 UI 没打开且未解锁，就可以一次按键直接打开
+        return !IsKeypadCurrentlyOpen() && !targetUI.IsSolved;
     }
 
     // 必须实现接口里的 Interact
@@ -26,6 +31,11 @@ public class InteractableOpenUI : MonoBehaviour, IInteractable
 
         if (targetUI != null)
         {
+            if (IsKeypadCurrentlyOpen() || targetUI.IsSolved)
+            {
+                return;
+            }
+
             // 调用 UI 脚本里的打开方法
             targetUI.OpenKeypad();
         }
@@ -33,5 +43,25 @@ public class InteractableOpenUI : MonoBehaviour, IInteractable
         {
             Debug.LogError("你忘记把 UI 物体拖进 Inspector 里的 TargetUI 槽位了！");
         }
+    }
+
+    private bool IsKeypadCurrentlyOpen()
+    {
+        if (targetUI == null)
+        {
+            return false;
+        }
+
+        if (targetUI.IsOpen)
+        {
+            return true;
+        }
+
+        if (targetUI.uiPanel != null)
+        {
+            return targetUI.uiPanel.activeSelf;
+        }
+
+        return false;
     }
 }
