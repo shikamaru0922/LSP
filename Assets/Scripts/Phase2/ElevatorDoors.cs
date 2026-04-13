@@ -22,6 +22,10 @@ public class ElevatorDoors : MonoBehaviour
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip openSound; // 电梯“叮”的一声或者机械声
     [SerializeField] private AudioClip closeSound;
+    [SerializeField] private AudioClip arrivalDingSound;
+    [SerializeField] private bool playArrivalDingBeforeOpen = true;
+    [SerializeField] private bool waitForArrivalDingToFinish = true;
+    [SerializeField, Min(0f)] private float extraDelayAfterArrivalDing = 0f;
 
     [Header("状态")]
     [Tooltip("游戏开始时门是否是开着的？")]
@@ -115,6 +119,20 @@ public class ElevatorDoors : MonoBehaviour
     private IEnumerator MoveDoorsProcess(bool open)
     {
         _isOpen = open;
+
+        if (open && playArrivalDingBeforeOpen && audioSource && arrivalDingSound)
+        {
+            audioSource.PlayOneShot(arrivalDingSound);
+
+            if (waitForArrivalDingToFinish)
+            {
+                float waitDuration = Mathf.Max(0f, arrivalDingSound.length + extraDelayAfterArrivalDing);
+                if (waitDuration > 0f)
+                {
+                    yield return new WaitForSeconds(waitDuration);
+                }
+            }
+        }
 
         // 播放音效
         AudioClip clip = open ? openSound : closeSound;
