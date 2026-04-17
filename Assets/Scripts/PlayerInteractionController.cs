@@ -76,6 +76,11 @@ namespace LSP.Gameplay
         private float focusedCrosshairScaleMultiplier = 7f;
 
         [SerializeField]
+        [Tooltip("Opacity used while the interactable F prompt is visible. 0.3 = 30%.")]
+        [Range(0f, 1f)]
+        private float focusedPromptOpacity = 0.3f;
+
+        [SerializeField]
         [Tooltip("Optional UI object shown while there is no interactable focus (for example, an idle F icon).")]
         private GameObject interactPromptIdleObject;
 
@@ -676,11 +681,12 @@ namespace LSP.Gameplay
 
                 if (useCrosshairColorFeedback)
                 {
-                    crosshairGraphic.color = hasInteractableFocus ? interactableCrosshairColor : defaultCrosshairColor;
+                    Color focusColor = hasInteractableFocus ? interactableCrosshairColor : defaultCrosshairColor;
+                    crosshairGraphic.color = ApplyInteractionOpacity(focusColor, hasInteractableFocus);
                 }
                 else
                 {
-                    crosshairGraphic.color = defaultCrosshairColor;
+                    crosshairGraphic.color = ApplyInteractionOpacity(defaultCrosshairColor, hasInteractableFocus);
                 }
             }
 
@@ -691,7 +697,42 @@ namespace LSP.Gameplay
 
             if (interactPromptObject != null)
             {
+                SetPromptObjectOpacity(interactPromptObject, hasInteractableFocus ? focusedPromptOpacity : 1f);
                 interactPromptObject.SetActive(hasInteractableFocus);
+            }
+        }
+
+        private Color ApplyInteractionOpacity(Color color, bool hasInteractableFocus)
+        {
+            if (!hasInteractableFocus)
+            {
+                return color;
+            }
+
+            color.a = Mathf.Clamp01(focusedPromptOpacity);
+            return color;
+        }
+
+        private static void SetPromptObjectOpacity(GameObject targetObject, float alpha)
+        {
+            if (targetObject == null)
+            {
+                return;
+            }
+
+            float clampedAlpha = Mathf.Clamp01(alpha);
+            var graphics = targetObject.GetComponentsInChildren<Graphic>(true);
+            for (int i = 0; i < graphics.Length; i++)
+            {
+                Graphic graphic = graphics[i];
+                if (graphic == null)
+                {
+                    continue;
+                }
+
+                Color color = graphic.color;
+                color.a = clampedAlpha;
+                graphic.color = color;
             }
         }
     }
