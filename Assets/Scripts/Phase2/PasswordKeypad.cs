@@ -48,6 +48,7 @@ public class PasswordKeypad : MonoBehaviour
     private bool starterInputOverrideActive;
     private bool cachedCursorLocked;
     private bool cachedCursorInputForLook;
+    private bool cachedStarterInputsEnabled;
 
     /// <summary>
     /// 当前密码 UI 是否处于打开状态。
@@ -61,17 +62,8 @@ public class PasswordKeypad : MonoBehaviour
     
     void Start()
     {
+        ResolveDependenciesIfNeeded();
         _interactFlagScript = GetComponent<InteractableSetFlag>();
-        
-        if (interactionController == null)
-        {
-            interactionController = FindObjectOfType<PlayerInteractionController>();
-        }
-
-        if (starterInputs == null)
-        {
-            starterInputs = FindObjectOfType<StarterAssetsInputs>();
-        }
 
         // 如果此脚本在首次交互时才被激活，OpenKeypad 可能先于 Start 调用。
         // 这种情况下不能在 Start 再次强制隐藏，否则会出现“第一次按键打不开、第二次才打开”。
@@ -126,6 +118,7 @@ public class PasswordKeypad : MonoBehaviour
             return;
         }
 
+        ResolveDependenciesIfNeeded();
         isOpen = true; // 【新增】标记状态为打开
         SetUiInputState(true);
         
@@ -255,6 +248,8 @@ public class PasswordKeypad : MonoBehaviour
 
     private void SetUiInputState(bool uiOpened)
     {
+        ResolveDependenciesIfNeeded();
+
         if (interactionController != null)
         {
             interactionController.IsUiOpen = uiOpened;
@@ -305,10 +300,16 @@ public class PasswordKeypad : MonoBehaviour
             return;
         }
 
+        cachedStarterInputsEnabled = starterInputs.enabled;
         cachedCursorLocked = starterInputs.cursorLocked;
         cachedCursorInputForLook = starterInputs.cursorInputForLook;
+        starterInputs.MoveInput(Vector2.zero);
+        starterInputs.LookInput(Vector2.zero);
+        starterInputs.JumpInput(false);
+        starterInputs.SprintInput(false);
         starterInputs.cursorLocked = false;
         starterInputs.cursorInputForLook = false;
+        starterInputs.enabled = false;
         starterInputOverrideActive = true;
     }
 
@@ -321,10 +322,28 @@ public class PasswordKeypad : MonoBehaviour
 
         if (starterInputs != null)
         {
+            starterInputs.enabled = cachedStarterInputsEnabled;
             starterInputs.cursorLocked = cachedCursorLocked;
             starterInputs.cursorInputForLook = cachedCursorInputForLook;
+            starterInputs.MoveInput(Vector2.zero);
+            starterInputs.LookInput(Vector2.zero);
+            starterInputs.JumpInput(false);
+            starterInputs.SprintInput(false);
         }
 
         starterInputOverrideActive = false;
+    }
+
+    private void ResolveDependenciesIfNeeded()
+    {
+        if (interactionController == null)
+        {
+            interactionController = FindObjectOfType<PlayerInteractionController>();
+        }
+
+        if (starterInputs == null)
+        {
+            starterInputs = FindObjectOfType<StarterAssetsInputs>();
+        }
     }
 }

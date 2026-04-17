@@ -151,6 +151,38 @@ namespace StarterAssets
 			}
 		}
 
+		/// <summary>
+		/// Forces the player and camera to look towards a world-space direction once.
+		/// Useful for scripted respawns/cinematics.
+		/// </summary>
+		public void ForceLookDirection(Vector3 worldDirection)
+		{
+			if (worldDirection.sqrMagnitude <= 0.0001f)
+			{
+				return;
+			}
+
+			Vector3 normalizedDirection = worldDirection.normalized;
+			Vector3 planarForward = Vector3.ProjectOnPlane(normalizedDirection, Vector3.up);
+			if (planarForward.sqrMagnitude > 0.0001f)
+			{
+				transform.rotation = Quaternion.LookRotation(planarForward.normalized, Vector3.up);
+			}
+
+			if (CinemachineCameraTarget == null)
+			{
+				return;
+			}
+
+			Vector3 localDirection = Quaternion.Inverse(transform.rotation) * normalizedDirection;
+			float verticalAmount = localDirection.y;
+			float horizontalAmount = Mathf.Sqrt((localDirection.x * localDirection.x) + (localDirection.z * localDirection.z));
+			float targetPitch = Mathf.Atan2(verticalAmount, horizontalAmount) * Mathf.Rad2Deg;
+
+			_cinemachineTargetPitch = ClampAngle(targetPitch, BottomClamp, TopClamp);
+			CinemachineCameraTarget.transform.localRotation = Quaternion.Euler(_cinemachineTargetPitch, 0.0f, 0.0f);
+		}
+
 		private void Move()
 		{
 			// set target speed based on move speed, sprint speed and if sprint is pressed

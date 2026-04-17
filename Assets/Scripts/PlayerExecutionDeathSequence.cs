@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -50,6 +51,7 @@ namespace LSP.Gameplay
         private bool deathCompleted;
         private string sceneToLoadOverride;
         private float? sceneLoadDelayOverride;
+        public event Action DeathSequenceCompleted;
 
         private void Reset()
         {
@@ -149,6 +151,7 @@ namespace LSP.Gameplay
             deathCompleted = true;
 
             if (deathRoutine != null) { StopCoroutine(deathRoutine); deathRoutine = null; }
+            DeathSequenceCompleted?.Invoke();
 
             // 【核心修改】如果在导演里被禁止了，或者Inspector里勾选了禁止，直接在这里停住！
             // 这样场景就不会重载，UI 就能稳稳地停留在那里。

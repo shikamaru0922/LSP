@@ -1279,13 +1279,17 @@ namespace LSP.Gameplay
                 return cachedPlayerState;
             }
 
-            if (chaseTarget == null)
+            if (chaseTarget != null)
             {
-                return null;
+                cachedPlayerState = chaseTarget.GetComponent<PlayerStateController>()
+                    ?? chaseTarget.GetComponentInParent<PlayerStateController>()
+                    ?? chaseTarget.GetComponentInChildren<PlayerStateController>(true);
             }
 
-            cachedPlayerState = chaseTarget.GetComponent<PlayerStateController>()
-                ?? chaseTarget.GetComponentInParent<PlayerStateController>();
+            if (cachedPlayerState == null)
+            {
+                cachedPlayerState = FindObjectOfType<PlayerStateController>();
+            }
 
             return cachedPlayerState;
         }
@@ -1302,7 +1306,8 @@ namespace LSP.Gameplay
             PlayerStateController player = playerOverride ?? ResolveChaseTargetPlayer();
             if (player == null)
             {
-                Debug.LogWarning("MonsterController could not find a PlayerStateController to kill.");
+                string targetName = chaseTarget != null ? chaseTarget.name : "null";
+                Debug.LogWarning($"MonsterController could not find a PlayerStateController to kill. chaseTarget={targetName}");
                 return;
             }
 
