@@ -7,6 +7,7 @@ using System.Collections;
 using UnityEngine.UI;
 using StarterAssets;
 using LSP.Gameplay;
+using MuseumGame.Interaction;
 
 [System.Serializable]
 public class GameFlag
@@ -153,6 +154,36 @@ public class LevelTwoDirector : MonoBehaviour
 
     [Tooltip("死亡 UI 按钮文本。")]
     [SerializeField] private string deathUiButtonText = "Reset";
+
+    [Header("===== 死亡重载前状态补齐 =====")]
+    [Tooltip("点击 Reset 重载前，自动把“门/怪物触发”相关 Flag 补成 True，避免重载后门锁死。")]
+    [SerializeField] private bool forceDoorAndMonsterFlagsBeforeDeathReload = true;
+
+    [Tooltip("重载前是否在当前场景立即执行这些 Flag 的 onTrue（例如立刻开门）。")]
+    [SerializeField] private bool applyForcedFlagsImmediatelyBeforeDeathReload = true;
+
+    [Tooltip("按关键词匹配要在重载前补齐的 Flag。默认覆盖门和怪物触发。")]
+    [SerializeField] private List<string> deathReloadForceFlagKeywords = new List<string> { "Door", "Enemy", "Monster" };
+
+    [Tooltip("额外强制补齐的 Flag 名字（精确匹配，忽略大小写）。")]
+    [SerializeField] private List<string> deathReloadForceFlagNames = new List<string>();
+
+    [Header("===== 假雕像重置修复 =====")]
+    [Tooltip("死亡重载恢复后，按 Deactivate Flag 强制关闭假雕像，避免异常重新出现。")]
+    [SerializeField] private bool enforceFakeStatuesClosedAfterDeathRestore = true;
+
+    [SerializeField] private string fakeStatue1DeactivateFlagName = "FakeStatue1Deactivate";
+    [SerializeField] private string fakeStatue2DeactivateFlagName = "FakeStatue2Deactivate";
+    [SerializeField] private string fakeStatue1ObjectName = "E-2-Stage-2 (5)";
+    [SerializeField] private string fakeStatue2ObjectName = "E-2-Stage-2 (6)";
+
+    [Header("===== 死亡恢复后门状态 =====")]
+    [Tooltip("死亡重置恢复后，强制把场景里门脚本打开，保证可通行。")]
+    [SerializeField] private bool openAllDoorsAfterDeathRestore = true;
+
+    [SerializeField] private bool includeElectronicDoorsOnDeathRestore = true;
+    [SerializeField] private bool includeElevatorDoorsOnDeathRestore = true;
+    [SerializeField] private bool keepTransitionElevatorDoorClosedAfterDeathRestore = true;
 
     // 字典：用来快速查找，代码里查起来快
     private Dictionary<string, GameFlag> flagMap = new Dictionary<string, GameFlag>();
@@ -697,6 +728,8 @@ public class LevelTwoDirector : MonoBehaviour
             CaptureDeathRestoreSnapshot();
         }
 
+        ForceFlagsBeforeDeathReload();
+
         Scene currentScene = SceneManager.GetActiveScene();
         if (!currentScene.IsValid())
         {
@@ -704,6 +737,121 @@ public class LevelTwoDirector : MonoBehaviour
         }
 
         SceneManager.LoadScene(currentScene.name);
+    }
+
+    private void ForceFlagsBeforeDeathReload()
+    {
+        if (!forceDoorAndMonsterFlagsBeforeDeathReload || flags == null || flags.Count == 0)
+        {
+            return;
+        }
+
+        suppressTransitionFlagHandling = true;
+        try
+        {
+            for (int i = 0; i < flags.Count; i++)
+            {
+                GameFlag flag = flags[i];
+                if (flag == null || string.IsNullOrWhiteSpace(flag.flagName))
+                {
+                    continue;
+                }
+
+                if (!ShouldForceFlagBeforeDeathReload(flag.flagName))
+                {
+                    continue;
+                }
+
+                if (!Phase2DeathResumeCache.trueFlagNames.Contains(flag.flagName))
+                {
+                    Phase2DeathResumeCache.trueFlagNames.Add(flag.flagName);
+                }
+
+                if (applyForcedFlagsImmediatelyBeforeDeathReload && !flag.currentValue)
+                {
+                    SetFlagTrue(flag.flagName);
+                }
+            }
+        }
+        finally
+        {
+            suppressTransitionFlagHandling = false;
+        }
+    }
+
+    private bool ShouldForceFlagBeforeDeathReload(string flagName)
+    {
+        if (string.IsNullOrWhiteSpace(flagName))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(levelCompleteFlagName) &&
+            string.Equals(flagName, levelCompleteFlagName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(preloadTriggerFlagName) &&
+            string.Equals(flagName, preloadTriggerFlagName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (ContainsExactNameIgnoreCase(deathReloadForceFlagNames, flagName))
+        {
+            return true;
+        }
+
+        return ContainsKeywordIgnoreCase(deathReloadForceFlagKeywords, flagName);
+    }
+
+    private static bool ContainsExactNameIgnoreCase(List<string> names, string target)
+    {
+        if (names == null || names.Count == 0 || string.IsNullOrWhiteSpace(target))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < names.Count; i++)
+        {
+            string candidate = names[i];
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                continue;
+            }
+
+            if (string.Equals(candidate, target, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsKeywordIgnoreCase(List<string> keywords, string target)
+    {
+        if (keywords == null || keywords.Count == 0 || string.IsNullOrWhiteSpace(target))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < keywords.Count; i++)
+        {
+            string keyword = keywords[i];
+            if (string.IsNullOrWhiteSpace(keyword))
+            {
+                continue;
+            }
+
+            if (target.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void TryApplyPendingDeathRestore()
@@ -733,6 +881,8 @@ public class LevelTwoDirector : MonoBehaviour
         ResolveTransitionReferences();
         RestorePlayerAfterDeath();
         RestoreFlagsAfterDeath();
+        EnforceFakeStatueClosedStateAfterDeathRestore();
+        ForceOpenAllDoorsAfterDeathRestore();
         Phase2DeathResumeCache.Clear();
     }
 
@@ -837,6 +987,119 @@ public class LevelTwoDirector : MonoBehaviour
         finally
         {
             suppressTransitionFlagHandling = false;
+        }
+    }
+
+    private void EnforceFakeStatueClosedStateAfterDeathRestore()
+    {
+        if (!enforceFakeStatuesClosedAfterDeathRestore)
+        {
+            return;
+        }
+
+        if (IsFlagMarkedTrueForRestore(fakeStatue1DeactivateFlagName))
+        {
+            SetSceneObjectActiveByName(fakeStatue1ObjectName, false);
+        }
+
+        if (IsFlagMarkedTrueForRestore(fakeStatue2DeactivateFlagName))
+        {
+            SetSceneObjectActiveByName(fakeStatue2ObjectName, false);
+        }
+    }
+
+    private bool IsFlagMarkedTrueForRestore(string flagName)
+    {
+        if (string.IsNullOrWhiteSpace(flagName))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < Phase2DeathResumeCache.trueFlagNames.Count; i++)
+        {
+            if (string.Equals(
+                Phase2DeathResumeCache.trueFlagNames[i],
+                flagName,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        if (flagMap.TryGetValue(flagName, out GameFlag runtimeFlag))
+        {
+            return runtimeFlag != null && runtimeFlag.currentValue;
+        }
+
+        return false;
+    }
+
+    private void SetSceneObjectActiveByName(string objectName, bool active)
+    {
+        if (string.IsNullOrWhiteSpace(objectName))
+        {
+            return;
+        }
+
+        Transform target = FindSceneTransformByName(objectName);
+        if (target == null || target.gameObject.activeSelf == active)
+        {
+            return;
+        }
+
+        target.gameObject.SetActive(active);
+    }
+
+    private void ForceOpenAllDoorsAfterDeathRestore()
+    {
+        if (!openAllDoorsAfterDeathRestore)
+        {
+            return;
+        }
+
+        ResolveTransitionReferences();
+        ElevatorDoors transitionElevatorDoor = keepTransitionElevatorDoorClosedAfterDeathRestore
+            ? elevatorDoors
+            : null;
+
+        if (includeElectronicDoorsOnDeathRestore)
+        {
+            ElectronicDoor[] electronicDoors = FindObjectsOfType<ElectronicDoor>(true);
+            for (int i = 0; i < electronicDoors.Length; i++)
+            {
+                ElectronicDoor door = electronicDoors[i];
+                if (door == null)
+                {
+                    continue;
+                }
+
+                door.ForceUnlockAndOpenImmediate(false);
+            }
+        }
+
+        if (includeElevatorDoorsOnDeathRestore)
+        {
+            ElevatorDoors[] elevatorDoorComponents = FindObjectsOfType<ElevatorDoors>(true);
+            for (int i = 0; i < elevatorDoorComponents.Length; i++)
+            {
+                ElevatorDoors elevatorDoor = elevatorDoorComponents[i];
+                if (elevatorDoor == null)
+                {
+                    continue;
+                }
+
+                if (transitionElevatorDoor != null && ReferenceEquals(elevatorDoor, transitionElevatorDoor))
+                {
+                    continue;
+                }
+
+                elevatorDoor.ForceOpenImmediate(false);
+            }
+        }
+
+        if (transitionElevatorDoor != null)
+        {
+            transitionElevatorDoor.CloseElevator();
         }
     }
 

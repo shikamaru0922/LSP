@@ -102,6 +102,31 @@ public class ElevatorDoors : MonoBehaviour
         StartDoorMove(false);
     }
 
+    /// <summary>
+    /// Forces the elevator to fully open immediately, bypassing animation/sound timing.
+    /// </summary>
+    public void ForceOpenImmediate(bool invokeOpenedEvent = false)
+    {
+        if (leftDoor == null || rightDoor == null)
+        {
+            return;
+        }
+
+        if (_moveCoroutine != null)
+        {
+            StopCoroutine(_moveCoroutine);
+            _moveCoroutine = null;
+        }
+
+        _isOpen = true;
+        SetDoorPositions(1.0f);
+
+        if (invokeOpenedEvent)
+        {
+            onFullyOpened?.Invoke();
+        }
+    }
+
     private void StartDoorMove(bool open)
     {
         if (_moveCoroutine != null)

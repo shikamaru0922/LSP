@@ -183,6 +183,39 @@ namespace MuseumGame.Interaction
             StartCoroutine(CloseSequence());
         }
 
+        /// <summary>
+        /// Forces this door into an unlocked/open state immediately.
+        /// Used by reset/restore flows where all phase doors must be traversable.
+        /// </summary>
+        public void ForceUnlockAndOpenImmediate(bool invokeEvents = false)
+        {
+            if (_openRoutine != null)
+            {
+                StopCoroutine(_openRoutine);
+                _openRoutine = null;
+            }
+
+            _isLocked = false;
+            _isOpen = true;
+            _targetDoorAngle = _openAngle;
+            _currentDoorAngle = _openAngle;
+            UpdateDoorRotation(_currentDoorAngle);
+            ApplyNavMeshObstacleState(false);
+
+            if (_doorHandle != null)
+            {
+                _doorHandle.localRotation = Quaternion.Euler(_handleUpRotation);
+            }
+
+            DisableLocalBlinkHighlight();
+
+            if (invokeEvents)
+            {
+                _onUnlockSuccess?.Invoke();
+                _onOpened?.Invoke();
+            }
+        }
+
         private IEnumerator CloseSequence()
         {
             _openRoutine = StartCoroutine(DoNothing());
